@@ -1,0 +1,15 @@
+[project]
+name = "unsloth-fine-tune-gemma-4"
+version = "0.1.0"
+description = "Inference and fine-tuning examples for Gemma 4 with Unsloth."
+requires-python = ">=3.10,<3.13"
+dependencies = [
+    "unsloth",
+    "huggingface_hub>=0.34.0",
+    "hf_transfer",
+]
+
+[tool.uv]
+# Unsloth pulls in torch, transformers, peft, trl, bitsandbytes, accelerate,
+# xformers, triton, and unsloth_zoo as transitive deps. Pin nothing else here
+# until a real conflict shows up.
