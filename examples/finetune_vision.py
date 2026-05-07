@@ -21,6 +21,17 @@ DATASET_NAME = "unsloth/LaTeX_OCR"
 INSTRUCTION = "Write the LaTeX representation for this image."
 
 
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+
+
 def generate(model, processor, image, instruction: str, max_new_tokens: int = 512) -> None:
     messages = [
         {
@@ -115,27 +126,33 @@ def main() -> None:
     )
     parser.add_argument(
         "--finetune-vision-layers",
-        type=bool,
+        type=str2bool,
         default=True,
-        help="Whether to fine-tune vision layers.",
+        help="Whether to fine-tune vision layers (True/False).",
     )
     parser.add_argument(
         "--finetune-language-layers",
-        type=bool,
+        type=str2bool,
         default=True,
-        help="Whether to fine-tune language layers.",
+        help="Whether to fine-tune language layers (True/False).",
     )
     parser.add_argument(
         "--finetune-attention-modules",
-        type=bool,
+        type=str2bool,
         default=True,
-        help="Whether to fine-tune attention modules.",
+        help="Whether to fine-tune attention modules (True/False).",
     )
     parser.add_argument(
         "--finetune-mlp-modules",
-        type=bool,
+        type=str2bool,
         default=True,
-        help="Whether to fine-tune MLP modules.",
+        help="Whether to fine-tune MLP modules (True/False).",
+    )
+    parser.add_argument(
+        "--epochs",
+        type=int,
+        default=1,
+        help="Number of training epochs (active when max-steps=-1).",
     )
     args = parser.parse_args()
 
@@ -198,6 +215,7 @@ def main() -> None:
             gradient_accumulation_steps=4,
             warmup_steps=args.warmup_steps,
             max_steps=args.max_steps,
+            num_train_epochs=args.epochs if args.max_steps == -1 else 1.0,
             learning_rate=args.learning_rate,
             logging_steps=1,
             optim="adamw_8bit",
