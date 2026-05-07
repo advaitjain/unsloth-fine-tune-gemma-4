@@ -73,3 +73,37 @@ For historical baseline reference, we retain the initial hyperparameter sweep ex
 ### 3. Key Historical Lessons
 - **Greedy Decoding**: Shifting to greedy decoding (`do_sample=False`) was the single largest driver of baseline correctness.
 - **Math Ceiling**: The 1B model hit a semantic ceiling; it successfully calculated gains but consistently forgot to net out repair costs in Problem 3. More training data or higher LoRA capacity ($r=32$) did not resolve this representation limit.
+
+---
+
+## Gemma 4 E2B Vision SFT Experiments (LaTeX OCR)
+
+We conducted SFT on the **Gemma 4 E2B Instruct** model (4-bit quantized) using the `unsloth/LaTeX_OCR` dataset. The task is to transcribe images of mathematical formulas into LaTeX.
+
+### 1. Evaluation Protocol
+* **Deterministic Greedy Decoding**: Evaluated with `do_sample=False`.
+* **Visual Verification**: We selected 3 representative test samples from the `LaTeX_OCR` test split and compared the raw LaTeX output BEFORE and AFTER fine-tuning.
+
+### 2. Experimental Results Table
+
+| Run ID | Precision | SFT Hyperparameters | Final Loss | Training Time | Peak VRAM | Key Behavioral Changes |
+|---|---|---|---|---|---|---|
+| **Vision-S1** | 4-bit | QLoRA ($r=16$, $\alpha=16$), 60 steps, 1k rows, LR $2e-4$ | **0.8659** | 2.8 min | ~9.5 GB | Delimiter shifted to `$$ ... $$`; corrected incorrect symbol generation (e.g., `\bar{\chi}` -> `\hat{x}`). |
+
+### 3. Qualitative Results (Before vs After)
+
+#### Sample 1: Variable Capture
+* **Expected:** `b _ { 2 } ^ { \pm } = \sum _ { \mu , \nu \in { \cal R } } ( L ^ { \pm } ) _ { \mu \nu } ^ { 2 } / ( 4 \omega C _ { \cal R } ) .`
+* **BEFORE:** `b_2^\pm = \sum_{\mu,\nu\in\mathbb{R}} (L^\pm)^2 \nu / (4\omega C_R).` (Missed `\mu` in the term `(L^\pm)^2 \nu`)
+* **AFTER:** `$$b_2^\pm = \sum_{\mu,\nu\in\mathbb{R}} (L^\pm)^2 \mu\nu / (4\omega C_R). $$` (Captured the missing `\mu` variable as `\mu\nu`)
+
+#### Sample 2: Delimiter Alignment
+* **Expected:** `\frac { \int _ { S } \vert \nabla \phi \vert ^ { 2 } d V } { \in t _ { S } \vert \phi \vert ^ { 2 } d V } < 1 0 \lambda .`
+* **BEFORE:** `\frac{\int_S |\nabla \phi|^2 dV}{\int_S |\phi|^2 dV} < 10\lambda.` (Correct math, but used code block formatting in logs)
+* **AFTER:** `$$\frac{\int_S |\nabla \phi|^2 dV}{\int_S |\phi|^2 dV} < 10\lambda.$$` (Correct math, aligned to standard LaTeX display delimiters)
+
+#### Sample 3: Symbol Correction (Crucial capability improvement)
+* **Expected:** `{ \frac { 1 } { ( \pi ) ^ { 4 } } } \int \! \! \! \int d ^ { 4 } \widehat { x } \phi ^ { n } ( \widehat { x } ) \neq { \frac { 1 } { ( \pi ) ^ { 4 } } } \int d ^ { 4 } x \phi ^ { n } ( x ) \quad n \geq 2`
+* **BEFORE:** `\frac{1}{(\pi)^4} \int d^4 \bar{\chi} \phi^n(\bar{\chi}) \neq \frac{1}{(\pi)^4} \int d^4 x \phi^n(x) \quad n \ge 2` (Incorrectly transcribed $\widehat{x}$ as `\bar{\chi}`)
+* **AFTER:** `$$\frac{1}{(\pi)^4} \int d^4 \hat{x} \phi^n(\hat{x}) \neq \frac{1}{(\pi)^4} \int d^4 x \phi^n(x) \quad n \ge 2$$` (Correctly transcribed $\widehat{x}$ as `\hat{x}`)
+
