@@ -12,12 +12,32 @@ needs ~8 GB of VRAM. On smaller cards, override with --model, for example:
 
 import argparse
 import os
+import re
 from PIL import Image
 
 from unsloth import FastModel
 from transformers import TextStreamer
 
 DEFAULT_MODEL = "unsloth/gemma-4-E2B-it-unsloth-bnb-4bit"
+
+
+def extract_latex(text: str) -> str:
+    # Try to extract from ```latex ... ```
+    match_code = re.search(r"```latex\s*(.*?)\s*```", text, re.DOTALL)
+    if match_code:
+        return match_code.group(1).strip()
+    
+    # Try to extract from $$ ... $$
+    match_display = re.search(r"\$\$\s*(.*?)\s*\$\$", text, re.DOTALL)
+    if match_display:
+        return match_display.group(1).strip()
+    
+    # Try to extract from $ ... $
+    match_inline = re.search(r"\$\s*(.*?)\s*\$", text, re.DOTALL)
+    if match_inline:
+        return match_inline.group(1).strip()
+        
+    return text.strip()
 
 
 def main() -> None:
@@ -115,7 +135,8 @@ def main() -> None:
         ).to("cuda")
 
     # Gemma team's recommended sampling settings.
-    model.generate(
+    # We capture the outputs to render them with TeXicode afterwards
+    outputs = model.generate(
         **inputs,
         max_new_tokens=args.max_new_tokens,
         temperature=1.0,
@@ -123,6 +144,28 @@ def main() -> None:
         top_k=64,
         streamer=TextStreamer(tokenizer.tokenizer if is_vlm else tokenizer, skip_prompt=True),
     )
+
+    # Extract and render LaTeX
+    input_length = inputs.input_ids.shape[1]
+    generated_tokens = outputs[0][input_length:]
+    tok = tokenizer.tokenizer if is_vlm else tokenizer
+    output_text = tok.decode(generated_tokens, skip_special_tokens=True)
+
+    try:
+        import texicode.pipeline as tp
+        
+        cleaned_latex = extract_latex(output_text)
+        # Simple heuristic: if it has math symbols or we successfully extracted it
+        if cleaned_latex != output_text or any(c in cleaned_latex for c in ['\\', '^', '_', '{', '}']):
+            print(f"\n\n{'=' * 40}\nRendered LaTeX (via TeXicode):\n{'=' * 40}")
+            # We use context='raw' for direct terminal printing
+            rendered = tp.render_tex(cleaned_latex, False, True, "raw", {"fonts": "normal"})
+            print(rendered)
+            print('=' * 40)
+    except ImportError:
+        pass  # texicode not installed (should not happen as we added it to deps)
+    except Exception as e:
+        print(f"\n(Failed to render LaTeX via TeXicode: {e})")
 
 
 if __name__ == "__main__":

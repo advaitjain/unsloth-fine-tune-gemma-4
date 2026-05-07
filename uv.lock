@@ -1646,6 +1646,15 @@ wheels = [
 ]
 
 [[package]]
+name = "texicode"
+version = "1.0.3"
+source = { registry = "https://us-python.pkg.dev/artifact-foundry-prod/ah-3p-staging-python/simple/" }
+sdist = { url = "https://us-python.pkg.dev/artifact-foundry-prod/ah-3p-staging-python/texicode/texicode-1.0.3.tar.gz", hash = "sha256:a60a8cc5afc5cd2318c1d5f5d871f03cacdff9350f96f1129765a64bb763a9fd" }
+wheels = [
+    { url = "https://us-python.pkg.dev/artifact-foundry-prod/ah-3p-staging-python/texicode/texicode-1.0.3-py3-none-any.whl", hash = "sha256:114853c4add5077ebdb07ad7e741c9761b32b6a452f62da8dd5e03d584bdfb63" },
+]
+
+[[package]]
 name = "tokenizers"
 version = "0.22.2"
 source = { registry = "https://us-python.pkg.dev/artifact-foundry-prod/ah-3p-staging-python/simple/" }
@@ -1948,6 +1957,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "hf-transfer" },
     { name = "huggingface-hub" },
+    { name = "texicode" },
     { name = "unsloth" },
 ]
 
@@ -1955,6 +1965,7 @@ dependencies = [
 requires-dist = [
     { name = "hf-transfer" },
     { name = "huggingface-hub", specifier = ">=0.34.0" },
+    { name = "texicode" },
     { name = "unsloth" },
 ]
 
