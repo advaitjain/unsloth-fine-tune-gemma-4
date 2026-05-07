@@ -595,6 +595,17 @@ wheels = [
 ]
 
 [[package]]
+name = "litert-lm-api"
+version = "0.11.0"
+source = { registry = "https://us-python.pkg.dev/artifact-foundry-prod/ah-3p-staging-python/simple/" }
+wheels = [
+    { url = "https://us-python.pkg.dev/artifact-foundry-prod/ah-3p-staging-python/litert-lm-api/litert_lm_api-0.11.0-py3-none-macosx_12_0_arm64.whl", hash = "sha256:5ae4a1e6b972fc1c058e18470d7e8a84ff489a14e7916e26d98c07059c8143e5" },
+    { url = "https://us-python.pkg.dev/artifact-foundry-prod/ah-3p-staging-python/litert-lm-api/litert_lm_api-0.11.0-py3-none-manylinux_2_27_aarch64.whl", hash = "sha256:afbc8bee6370a07d5d39461d299bb50b25d08d43dd71897e961fcfaf1f8635cb" },
+    { url = "https://us-python.pkg.dev/artifact-foundry-prod/ah-3p-staging-python/litert-lm-api/litert_lm_api-0.11.0-py3-none-manylinux_2_27_x86_64.whl", hash = "sha256:1e58702a5e81636007fa19044fe0c6973277b1cbd4f713fe6d22df43b3baa7f8" },
+    { url = "https://us-python.pkg.dev/artifact-foundry-prod/ah-3p-staging-python/litert-lm-api/litert_lm_api-0.11.0-py3-none-win_amd64.whl", hash = "sha256:6de60b246c089d0229d5a8e4d8e889efb527adb7cce958c68ead32427cdd1e13" },
+]
+
+[[package]]
 name = "markdown-it-py"
 version = "4.1.0"
 source = { registry = "https://us-python.pkg.dev/artifact-foundry-prod/ah-3p-staging-python/simple/" }
@@ -1957,6 +1968,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "hf-transfer" },
     { name = "huggingface-hub" },
+    { name = "litert-lm-api" },
     { name = "texicode" },
     { name = "unsloth" },
 ]
@@ -1965,6 +1977,7 @@ dependencies = [
 requires-dist = [
     { name = "hf-transfer" },
     { name = "huggingface-hub", specifier = ">=0.34.0" },
+    { name = "litert-lm-api" },
     { name = "texicode" },
     { name = "unsloth" },
 ]
