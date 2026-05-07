@@ -175,10 +175,18 @@ def main() -> None:
     )
 
     # Mask question tokens so loss is computed only on the model's answer.
+    # Gemma 4 uses different turn markers than Gemma 3.
+    if "gemma-4" in args.model.lower():
+        instruction_part = "<|turn>user\n"
+        response_part = "<|turn>model\n"
+    else:
+        instruction_part = "<start_of_turn>user\n"
+        response_part = "<start_of_turn>model\n"
+
     trainer = train_on_responses_only(
         trainer,
-        instruction_part="<start_of_turn>user\n",
-        response_part="<start_of_turn>model\n",
+        instruction_part=instruction_part,
+        response_part=response_part,
     )
 
     trainer.train()

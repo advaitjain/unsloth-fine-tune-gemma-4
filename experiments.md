@@ -186,5 +186,6 @@ This section documents systematic evaluations of the Gemma 4 E2B model (4-bit an
 ### SFT Tuning Sweeps
 
 | Run | Base Model | Precision | Parameters | GSM8K Test Accuracy (N=50) | Final Loss | Wall Clock |
-|---|---|---|---|---|---|---|
+| 4B-S1 | `unsloth/gemma-4-E2B-it-unsloth-bnb-4bit` | 4-bit | QLoRA (r=8, a=8), steps=60, rows=1000 | 37/50 (74.00%) | 1.053 | 2.6 min |
+| 4B-S2 | `unsloth/gemma-4-E2B-it-unsloth-bnb-4bit` | 4-bit | QLoRA (r=8, a=8), steps=300, rows=2000 | 16/50 (32.00%) | 0.5556 | 9.9 min |
 
