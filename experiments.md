@@ -171,3 +171,20 @@ the base model id separately.
 | `--adapter` / `-a` | (none) | Path to a saved LoRA adapter dir; base is inferred from `adapter_config.json`. |
 | `--max-new-tokens` | 512 | Generation cap per problem. |
 | `--max-seq-length` | 2048 | Tokenizer / context window. |
+
+## Gemma 4 E2B Systematic Experiments (N=50)
+
+This section documents systematic evaluations of the Gemma 4 E2B model (4-bit and fp16 variants) on a 50-problem subset of the GSM8K test split using the automated evaluation tool (`examples/eval_gsm8k_automated.py`).
+
+### Baseline Results
+
+| Run | Base Model | Precision | GSM8K Test Accuracy (N=50) |
+|---|---|---|---|
+| B1 | `unsloth/gemma-4-E2B-it-unsloth-bnb-4bit` | 4-bit | 43/50 (86.00%) |
+| B2 | `unsloth/gemma-4-E2B-it` | fp16 | 43/50 (86.00%) |
+
+### SFT Tuning Sweeps
+
+| Run | Base Model | Precision | Parameters | GSM8K Test Accuracy (N=50) | Final Loss | Wall Clock |
+|---|---|---|---|---|---|---|
+
