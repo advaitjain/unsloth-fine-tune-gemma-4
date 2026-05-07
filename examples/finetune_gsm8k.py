@@ -119,13 +119,19 @@ def main() -> None:
         default="linear",
         help="HF scheduler name: linear, cosine, constant, etc.",
     )
+    parser.add_argument(
+        "--no-4bit",
+        action="store_false",
+        dest="load_in_4bit",
+        help="Disable 4-bit loading (use fp16/bf16 precision).",
+    )
     args = parser.parse_args()
 
     model, tokenizer = FastModel.from_pretrained(
         model_name=args.model,
         dtype=None,
         max_seq_length=args.max_seq_length,
-        load_in_4bit=True,
+        load_in_4bit=args.load_in_4bit,
         full_finetuning=False,
     )
 

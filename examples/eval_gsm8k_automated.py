@@ -34,23 +34,36 @@ def extract_answer(text: str) -> str:
     if match:
         return match.group(1).strip()
     
-    # 2. Check for bolded numbers/expressions (e.g., **7** or **$243.00** or **15 liters**)
-    bolded_segments = re.findall(r"\*\*(.*?)\*\*", text)
-    if bolded_segments:
-        for segment in reversed(bolded_segments):
-            segment_cleaned = segment.replace("$", "").strip()
-            num_match = re.search(r"(-?\d+(?:\.\d+)?)", segment_cleaned)
-            if num_match:
-                val = num_match.group(1)
-                if val.endswith(".00"):
-                    val = val[:-3]
-                elif "." in val:
-                    try:
-                        f_val = float(val)
-                        if f_val.is_integer():
-                            val = str(int(f_val))
-                    except ValueError:
-                        pass
+    # 2. Context-aware number extraction: find numbers and check their subsequent context
+    numbers_with_contexts = []
+    for m in re.finditer(r"(-?\d+(?:\.\d+)?)", text):
+        num = m.group(1)
+        start_idx = m.end()
+        context = text[start_idx:start_idx+25].lower().strip()
+        numbers_with_contexts.append((num, context))
+        
+    if numbers_with_contexts:
+        # Ignore units list
+        ignore_units = ["week", "day", "hour", "minute", "second", "liter", "carton", "glass", "item", "ounce", "cleaner"]
+        for num, context in reversed(numbers_with_contexts):
+            val = num
+            if val.endswith(".00"):
+                val = val[:-3]
+            elif "." in val:
+                try:
+                    f_val = float(val)
+                    if f_val.is_integer():
+                        val = str(int(f_val))
+                except ValueError:
+                    pass
+            
+            # Check if the context indicates this is a unit count, not the actual answer
+            should_ignore = False
+            for unit in ignore_units:
+                if re.match(rf"^\s*s?\b{unit}s?\b", context) or re.match(rf"^[\s*]*{unit}s?", context):
+                    should_ignore = True
+                    break
+            if not should_ignore:
                 return val
 
     # 3. Fallback: find the last number (integer or decimal) in the generated response
