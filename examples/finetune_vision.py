@@ -108,8 +108,14 @@ def main() -> None:
     parser.add_argument(
         "--lora-alpha",
         type=int,
-        default=16,
-        help="LoRA alpha. Common choices: equal to rank, or 2x rank.",
+        default=None,
+        help="LoRA alpha. Defaults to 2x rank if not specified.",
+    )
+    parser.add_argument(
+        "--target-modules",
+        type=str,
+        default="",
+        help="Optional comma-separated target modules to apply LoRA to explicitly.",
     )
     parser.add_argument("--learning-rate", type=float, default=2e-4)
     parser.add_argument("--warmup-steps", type=int, default=5)
@@ -154,7 +160,24 @@ def main() -> None:
         default=1,
         help="Number of training epochs (active when max-steps=-1).",
     )
+    parser.add_argument(
+        "--vision-tokens",
+        type=int,
+        default=280,
+        help="Visual token budget per image (e.g. 280, 560, 1120).",
+    )
     args = parser.parse_args()
+
+    # Natively enforce the lora_alpha = 2 * lora_rank rule if omitted
+    if args.lora_alpha is None:
+        args.lora_alpha = 2 * args.lora_rank
+        print(f"Enforcing default 2x Alpha rule: setting lora_alpha = {args.lora_alpha}")
+
+    # Resolve custom target modules
+    target_modules_list = None
+    if args.target_modules.strip():
+        target_modules_list = [x.strip() for x in args.target_modules.split(",") if x.strip()]
+        print(f"Explicitly targeting modules: {target_modules_list}")
 
     # Load model and processor
     model, processor = FastVisionModel.from_pretrained(
@@ -163,6 +186,18 @@ def main() -> None:
         load_in_4bit=args.load_in_4bit,
         use_gradient_checkpointing="unsloth",
     )
+
+    if args.vision_tokens != 280:
+        print(f"Overriding visual token budget dynamically to {args.vision_tokens}...")
+        # 1. Modify Model Config
+        model.config.vision_soft_tokens_per_image = args.vision_tokens
+        model.config.vision_config.default_output_length = args.vision_tokens
+
+        # 2. Modify Processor Config
+        processor.image_processor.image_seq_length = args.vision_tokens
+        processor.image_processor.max_soft_tokens = args.vision_tokens
+        if hasattr(processor, "image_seq_length"):
+            processor.image_seq_length = args.vision_tokens
 
     # Configure LoRA
     model = FastVisionModel.get_peft_model(
@@ -176,6 +211,7 @@ def main() -> None:
         lora_dropout=0,
         bias="none",
         random_state=args.seed,
+        target_modules=target_modules_list,
     )
 
     # Load datasets

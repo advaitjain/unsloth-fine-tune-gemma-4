@@ -94,10 +94,95 @@ uv run python examples/finetune_vision.py --no-4bit --lora-rank 16 --lora-alpha 
 uv run python examples/finetune_vision.py --no-4bit --lora-rank 16 --lora-alpha 16 --max-steps 120 --learning-rate 2e-4 --finetune-vision-layers False --output-dir lora_vision_v4_frozen
 
 # Run V_Full_Trained (Full Epoch SFT - Vision Trained)
-uv run python examples/finetune_vision.py --no-4bit --lora-rank 16 --lora-alpha 16 --max-steps -1 --epochs 1 --train-rows 0 --learning-rate 2e-4 --output-dir lora_vision_v_full_trained
+uv run python examples/finetune_vision.py --no-4bit --lora-rank 16 --lora-alpha 16 --max-steps -1 --epochs 1 --train-rows 0 --learning-rate 1e-4 --output-dir lora_vision_v_full_trained
 
 # Run V_Full_Frozen (Full Epoch SFT - Vision Frozen)
-uv run python examples/finetune_vision.py --no-4bit --lora-rank 16 --lora-alpha 16 --max-steps -1 --epochs 1 --train-rows 0 --learning-rate 2e-4 --finetune-vision-layers False --output-dir lora_vision_v_full_frozen
+uv run python examples/finetune_vision.py --no-4bit --lora-rank 16 --lora-alpha 16 --max-steps -1 --epochs 1 --train-rows 0 --learning-rate 1e-4 --finetune-vision-layers False --output-dir lora_vision_v_full_frozen
 ```
 
-We will compile results into the results table as the sweeps complete.
+## 4. Experimental Results Table
+
+We systematically record the performance metrics of each run here:
+
+| Run ID | Sweep Focus | Vision Layers | Steps | Learning Rate | Avg EM (N=30) | Avg NED (N=30) | Peak VRAM | Training Time |
+|---|---|---|---|---|---|---|---|---|
+| **V0** | **Baseline** | — | — | — | **0.00%** | **71.57%** | ~10.5 GB | — |
+| **V1_Trained** | **Reference** | Trained | 60 | $2e-4$ | **3.33%** | **72.22%** | ~11.7 GB | 2.5 min |
+| **V1_Frozen** | **Reference Frozen**| Frozen | 60 | $2e-4$ | **0.00%** | **72.28%** | ~11.7 GB | 1.9 min |
+| **V2_Trained** | **High Capacity** | Trained | 60 | $2e-4$ | **6.67%** | **71.34%** | ~11.7 GB | 2.5 min |
+| **V2_Frozen** | **High Capacity Frz**| Frozen | 60 | $2e-4$ | **0.00%** | **73.39%** | ~11.7 GB | 1.9 min |
+| **V3_Trained** | **Lower LR** | Trained | 60 | $1e-4$ | **0.00%** | **74.76%** | ~11.7 GB | 2.45 min |
+| **V3_Frozen** | **Lower LR Frozen** | Frozen | 60 | $1e-4$ | **3.33%** | **75.03%** | ~11.7 GB | 1.9 min |
+| **V4_Trained** | **Extended Budget** | Trained | 120 | $2e-4$ | **3.33%** | **65.63%** | ~11.7 GB | 4.7 min |
+| **V4_Frozen** | **Extended Frozen** | Frozen | 120 | $2e-4$ | **3.33%** | **68.58%** | ~11.7 GB | 3.6 min |
+| **V_Full_Trn**| **Full Epoch** | Trained | 1 Ep | $1e-4$ | | | | |
+| **V_Full_Frz**| **Full Epoch Frozen**| Frozen | 1 Ep | $1e-4$ | | | | |
+
+---
+
+## 5. Symmetrical Sweeps with 560 Visual Token Budget
+
+To study the impact of visual resolution on LaTeX OCR mathematical details, we rerun the sweeps at a doubled visual token budget of **560 tokens per image** (using `--vision-tokens 560`).
+
+All runs are in full **fp16** (`load_in_4bit=False`, `dtype=torch.float16`) on the RTX 4090.
+
+### 5.1. Symmetrical Sweeps Matrix (560 Tokens)
+
+| Run ID | Sweep Focus | Vision Layers | LoRA Rank ($r$) | LoRA Alpha ($\alpha$) | Steps | Learning Rate | Expected Insights |
+|---|---|---|---|---|---|---|---|
+| **V0_560** | **Baseline** | — | — | — | — | — | Zero-shot VLM capability at double visual resolution. |
+| **V1_Trained_560** | **Reference** | Trained (`True`) | 16 | 16 | 60 | $2e-4$ | Double visual token OCR SFT performance. |
+| **V1_Frozen_560** | **Reference Frozen**| Frozen (`False`) | 16 | 16 | 60 | $2e-4$ | Symmetrical control with frozen vision. |
+| **V2_Trained_560** | **High Capacity** | Trained (`True`) | 32 | 32 | 60 | $2e-4$ | Double tokens + higher LoRA capacity. |
+| **V2_Frozen_560** | **High Capacity Frz**| Frozen (`False`) | 32 | 32 | 60 | $2e-4$ | Symmetrical control with frozen vision. |
+| **V3_Trained_560** | **Lower LR** | Trained (`True`) | 16 | 16 | 60 | $1e-4$ | Slower step learning under double tokens. |
+| **V3_Frozen_560** | **Lower LR Frozen** | Frozen (`False`) | 16 | 16 | 60 | $1e-4$ | Symmetrical control with frozen vision. |
+| **V4_Trained_560** | **Extended Budget** | Trained (`True`) | 16 | 16 | 120 | $2e-4$ | Overfitting test under double visual tokens. |
+| **V4_Frozen_560** | **Extended Frozen** | Frozen (`False`) | 16 | 16 | 120 | $2e-4$ | Symmetrical control with frozen vision. |
+
+### 5.2. CLI Reference Commands (560 Tokens)
+
+```bash
+# Run V0_560 (Baseline Eval)
+uv run python examples/eval_vision.py --model unsloth/gemma-4-E2B-it --no-4bit --eval-rows 30 --vision-tokens 560
+
+# Run V1_Trained_560 (Reference SFT)
+uv run python examples/finetune_vision.py --no-4bit --lora-rank 16 --lora-alpha 16 --max-steps 60 --learning-rate 2e-4 --vision-tokens 560 --output-dir lora_vision_v1_trained_560
+
+# Run V1_Frozen_560 (Reference Frozen SFT)
+uv run python examples/finetune_vision.py --no-4bit --lora-rank 16 --lora-alpha 16 --max-steps 60 --learning-rate 2e-4 --vision-tokens 560 --finetune-vision-layers False --output-dir lora_vision_v1_frozen_560
+
+# Run V2_Trained_560 (High Capacity SFT)
+uv run python examples/finetune_vision.py --no-4bit --lora-rank 32 --lora-alpha 32 --max-steps 60 --learning-rate 2e-4 --vision-tokens 560 --output-dir lora_vision_v2_trained_560
+
+# Run V2_Frozen_560 (High Capacity Frozen SFT)
+uv run python examples/finetune_vision.py --no-4bit --lora-rank 32 --lora-alpha 32 --max-steps 60 --learning-rate 2e-4 --vision-tokens 560 --finetune-vision-layers False --output-dir lora_vision_v2_frozen_560
+
+# Run V3_Trained_560 (Lower LR SFT)
+uv run python examples/finetune_vision.py --no-4bit --lora-rank 16 --lora-alpha 16 --max-steps 60 --learning-rate 1e-4 --vision-tokens 560 --output-dir lora_vision_v3_trained_560
+
+# Run V3_Frozen_560 (Lower LR Frozen SFT)
+uv run python examples/finetune_vision.py --no-4bit --lora-rank 16 --lora-alpha 16 --max-steps 60 --learning-rate 1e-4 --vision-tokens 560 --finetune-vision-layers False --output-dir lora_vision_v3_frozen_560
+
+# Run V4_Trained_560 (Extended SFT)
+uv run python examples/finetune_vision.py --no-4bit --lora-rank 16 --lora-alpha 16 --max-steps 120 --learning-rate 2e-4 --vision-tokens 560 --output-dir lora_vision_v4_trained_560
+
+# Run V4_Frozen_560 (Extended Frozen SFT)
+uv run python examples/finetune_vision.py --no-4bit --lora-rank 16 --lora-alpha 16 --max-steps 120 --learning-rate 2e-4 --vision-tokens 560 --finetune-vision-layers False --output-dir lora_vision_v4_frozen_560
+```
+
+### 5.3. Experimental Results Table (560 Tokens)
+
+| Run ID | Sweep Focus | Vision Layers | Steps | Learning Rate | Avg EM (N=30) | Avg NED (N=30) | Peak VRAM | Training Time |
+|---|---|---|---|---|---|---|---|---|
+| **V0_560** | **Baseline 560** | — | — | — | **3.33%** | **72.44%** | ~10.5 GB | — |
+| **V1_Trained_560** | **Reference** | Trained | 60 | $2e-4$ | **0.00%** | **68.79%** | ~11.7 GB | 2.95 min |
+| **V1_Frozen_560** | **Reference Frozen**| Frozen | 60 | $2e-4$ | **0.00%** | **74.43%** | ~11.7 GB | 2.0 min |
+| **V2_Trained_560** | **High Capacity** | Trained | 60 | $2e-4$ | **6.67%** | **69.06%** | ~11.7 GB | 2.97 min |
+| **V2_Frozen_560** | **High Capacity Frz**| Frozen | 60 | $2e-4$ | **3.33%** | **68.32%** | ~11.7 GB | 2.0 min |
+| **V3_Trained_560** | **Lower LR** | Trained | 60 | $1e-4$ | **3.33%** | **74.36%** | ~11.7 GB | 3.1 min |
+| **V3_Frozen_560** | **Lower LR Frozen** | Frozen | 60 | $1e-4$ | | | | |
+| **V4_Trained_560** | **Extended Budget** | Trained | 120 | $2e-4$ | | | | |
+| **V4_Frozen_560** | **Extended Frozen** | Frozen | 120 | $2e-4$ | | | | |
+
+

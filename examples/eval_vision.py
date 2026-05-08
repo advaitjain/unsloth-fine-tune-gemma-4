@@ -110,6 +110,12 @@ def main() -> None:
         dest="load_in_4bit",
         help="Disable 4-bit loading (use fp16/bf16 precision).",
     )
+    parser.add_argument(
+        "--vision-tokens",
+        type=int,
+        default=280,
+        help="Visual token budget per image (e.g. 280, 560, 1120).",
+    )
     args = parser.parse_args()
 
     print(f"Loading model: {args.model}...")
@@ -121,6 +127,18 @@ def main() -> None:
         load_in_4bit=args.load_in_4bit,
         full_finetuning=False,
     )
+
+    if args.vision_tokens != 280:
+        print(f"Overriding visual token budget dynamically to {args.vision_tokens}...")
+        # 1. Modify Model Config
+        model.config.vision_soft_tokens_per_image = args.vision_tokens
+        model.config.vision_config.default_output_length = args.vision_tokens
+
+        # 2. Modify Processor Config
+        tokenizer.image_processor.image_seq_length = args.vision_tokens
+        tokenizer.image_processor.max_soft_tokens = args.vision_tokens
+        if hasattr(tokenizer, "image_seq_length"):
+            tokenizer.image_seq_length = args.vision_tokens
 
     # Put model in inference mode
     FastModel.for_inference(model)
