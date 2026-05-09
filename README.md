@@ -109,6 +109,92 @@ uv run python examples/eval_gsm8k_automated.py --adapter lora_gsm8k_fp16_s1/ --n
 ### 2. Regex and Emotion Evals (Experimental Folder)
 To reproduce our Custom Syntax and Semantic classification sweeps, navigate to the `experimental/` directory. See [experimental/README.md](experimental/README.md) for exact commands and execution instructions.
 
+### 3. Multimodal LaTeX OCR SFT (RTX 4090)
+To reproduce our peak-performing high-capacity LaTeX OCR visual tuning benchmarks:
+
+```bash
+# A. Run zero-shot base model baseline (N=50)
+uv run python examples/eval_vision.py --model unsloth/gemma-4-E2B-it --no-4bit --eval-rows 50 --vision-tokens 280
+
+# B. Train 16-bit fp16 SFT peak-LoRA adapter (r=32, alpha=64, LR 5e-5, 280 tokens)
+uv run python examples/finetune_vision.py \
+  --model unsloth/gemma-4-E2B-it \
+  --no-4bit \
+  --lora-rank 32 \
+  --lora-alpha 64 \
+  --learning-rate 5e-5 \
+  --vision-tokens 280 \
+  --max-steps 60 \
+  --output-dir lora_vision_best
+
+# C. Evaluate the trained SFT adapter
+uv run python examples/eval_vision.py --model lora_vision_best/ --no-4bit --eval-rows 50 --vision-tokens 280
+
+# D. Merge LoRA adapters back into base weights to produce a 16-bit safetensors directory
+uv run python examples/merge_lora.py --adapter lora_vision_best --output-dir lora_vision_merged_fp16
+
+# E. Run streaming formula inference on a sample local image using the merged standalone safetensors
+uv run python examples/inference.py --model lora_vision_merged_fp16/
+```
+
+#### Qualitative Fine-Tuning Delta (Before vs. After SFT):
+
+Fine-tuning on standard display math delimiters successfully stabilizes structural alignments, maps correct operators, and extracts visual details:
+
+##### 1. Visual Symbol Resolution (Alpha vs. English 'a')
+
+*   **Input Image**: [sample_1.png](examples/sample_1.png)
+*   **Expected Ground Truth (GT)**:
+    ```latex
+    \omega _ { a b } ^ { \alpha \beta } ( x , y ) = m ^ { 2 } \epsilon ^ { \alpha \beta } \delta ^ { a b } \delta ( x - y )
+    ```
+*   **BEFORE SFT (Zero-Shot Base Model)**:
+    ```latex
+    \omega_{ab}^{a\beta}(x,y) = m^2 \epsilon^{a\beta} \delta^{ab} \delta(x-y)
+    ```
+    *Baseline Error*: Due to a visual feature extraction bottleneck at standard resolution, the base model missed the loop curvatures of the Greek letter `\alpha` (alpha) in `\omega` and `\epsilon` superscripts, misinterpreting them as a standard English `a` letter (`a\beta` and `a\beta` superscripts).
+*   **AFTER SFT (Fine-Tuned Peak LoRA Model)**:
+    ```latex
+    $$\omega_{ab}^{\alpha\beta}(x, y) = m^2 \epsilon^{\alpha\beta} \delta^{ab} \delta(x - y)$$
+    ```
+    *SFT Correction*: Successfully aligned local pixel layouts to correctly resolve the Greek mathematical letters, transcribing the formula perfectly while cleanly shifting standard delimiters.
+
+##### 2. Detail Omission Prevention (Compose Circle `\circ`)
+
+*   **Input Image**: [sample_2.png](examples/sample_2.png)
+*   **Expected Ground Truth (GT)**:
+    ```latex
+    \nabla _ { \mu } = T \circ \partial _ { \mu } \circ T ^ { + } + \Pi \circ \partial _ { \mu } \circ \Pi + \rho _ { \mu }
+    ```
+*   **BEFORE SFT (Zero-Shot Base Model)**:
+    ```latex
+    \nabla_{\mu} = T \circ \partial_{\mu} T^{+} + \Pi \circ \partial_{\mu} \Pi + \rho_{\mu}
+    ```
+    *Baseline Error*: The base model omitted two crucial mathematical compose operators (`\circ` circle indicators) right before `T^{+}` and `\Pi` terms, rendering the formula incomplete.
+*   **AFTER SFT (Fine-Tuned Peak LoRA Model)**:
+    ```latex
+    $$\nabla_{\mu} = T \circ \partial_{\mu} \circ T^{+} + \Pi \circ \partial_{\mu} \circ \Pi + \rho_{\mu}$$
+    ```
+    *SFT Correction*: Retained high-fidelity feature tracking, capturing all compose operators exactly.
+
+##### 3. Mathematical Syntax Alignment (`\cdots` vs. `\dots`)
+
+*   **Input Image**: [sample_3.png](examples/sample_3.png)
+*   **Expected Ground Truth (GT)**:
+    ```latex
+    n _ { i } = m _ { i } + m _ { i + 1 } + \cdots + m _ { N - 1 } + n _ { N } .
+    ```
+*   **BEFORE SFT (Zero-Shot Base Model)**:
+    ```latex
+    n_i = m_i + m_{i+1} + \dots + m_{N-1} + n_N.
+    ```
+    *Baseline Error*: Transcribed handwritten horizontal dots (dots of omission) using raw text `\dots` conventions.
+*   **AFTER SFT (Fine-Tuned Peak LoRA Model)**:
+    ```latex
+    $$n_i = m_i + m_{i+1} + \cdots + m_{N-1} + n_N.$$
+    ```
+    *SFT Correction*: Standardized predictions to use cented math dots (`\cdots`), conforming exactly to dataset annotations.
+
 ---
 
 ## Repository Structure
@@ -117,12 +203,23 @@ To reproduce our Custom Syntax and Semantic classification sweeps, navigate to t
 .
 ├── pyproject.toml                  # uv dependency definitions
 ├── experiments.md                  # Structured GSM8K results, findings & sweeps table
+├── latex_ocr_experiments.md        # Complete Master 50-run sweeps and 1-Epoch results for LaTeX OCR
 ├── README.md                       # Upfront takeaways, hardware bounds & reproduction index
+├── latex_ocr/                      # Sequential sweeps coordinator and researcher tools package
+│   ├── run_master_sweeps.py        # Sequential sweeps trainer + evaluator
+│   ├── run_full_epoch_sequel.py    # sequel scaled full epoch tuner
+│   └── inspect_processor.py        # processor structures and token budgets analyzer
 ├── examples/
-│   ├── inference.py                # Base model streaming inference smoke test
-│   ├── finetune_gsm8k.py           # GSM8K QLoRA and fp16 trainer (turn tag compatible)
-│   ├── eval_gsm8k.py               # original manual 3-example validation helper
-│   └── eval_gsm8k_automated.py     # Regex-based automated parser v3 evaluator (N=50)
+│   ├── inference.py                # Base model and merged safetensors formula inference text
+│   ├── finetune_gsm8k.py           # GSM8K QLoRA and fp16 trainer
+│   ├── finetune_vision.py          # LaTeX OCR multimodal fp16 trainer (epochs-limit compatible)
+│   ├── eval_vision.py              # High-precision greedy EM/NED validation evaluator (N=50)
+│   ├── merge_lora.py               # high-precision fp16 LoRA merging standalone safetensors tool
+│   ├── sample_1.png                # visual Greek alpha superscript target image
+│   ├── sample_2.png                # visual compose circle omission target image
+│   ├── sample_3.png                # visual centered dots token alignment target image
+│   ├── eval_gsm8k_automated.py     # Regex-based automated parser v3 evaluator (N=50)
+│   └── eval_gsm8k.py               # original manual 3-example validation helper
 └── experimental/
     ├── README.md                   # Unified design, findings and tables for Regex & Emotion tasks
     ├── train_regex.py              # High-LR QLoRA regex trainer
