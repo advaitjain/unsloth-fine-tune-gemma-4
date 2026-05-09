@@ -134,6 +134,66 @@ txc "<latex_formula_string>"
     *Replaces common text lower ellipsis with math centered dots \cdots.*
 
 
+
+## CUAD Legal SFT (Contract Understanding)
+
+Worked examples of parameter-efficient fine-tuning (PEFT) on legal commercial contracts for key-value clause extraction using the expert-annotated [CUAD (Contract Understanding Atticus Dataset)](https://github.com/TheAtticusProject/cuad) hosted on [Hugging Face](https://huggingface.co/datasets/theatticusproject/cuad).
+
+We fine-tune **Gemma 4 E2B** in full **16-bit precision (FP16)** to extract the exact contract segment specifying the `Governing Law` clause.
+
+```bash
+# A. Train 16-bit fp16 SFT Peak-LoRA adapter (r=32, alpha=64, LR 1e-4, Cosine scheduler, 160 steps)
+uv run python cuad/finetune_cuad.py \
+  --model unsloth/gemma-4-E2B-it \
+  --no-4bit \
+  --lora-rank 32 \
+  --lora-alpha 64 \
+  --learning-rate 1e-4 \
+  --lr-scheduler-type cosine \
+  --max-steps 160 \
+  --output-dir lora_cuad_best
+
+# B. Evaluate the trained LoRA SFT adapter offline (greedy EM and F1 average)
+uv run python cuad/eval_cuad.py --adapter lora_cuad_best/ --no-4bit --eval-rows 50
+
+# C. Run interactive demonstrator comparing Zero-Shot base outputs vs. SFT adapters side-by-side
+uv run python cuad/inference_demo.py --adapter lora_cuad_best/
+```
+
+#### Qualitative Fine-Tuning Delta (Before vs. After SFT):
+
+SFT successfully trims surrounding text and heading numbers noise from raw generations, achieving a **+20.00% absolute Exact Match (EM) average improvement** over Zero-Shot baselines (EM metrics jump from `62.00%` to **`82.00%`**).
+
+##### 1. Removing Section Numbering and Structural Headings Noise
+
+*   **Input Context Snippet**:
+    ```
+    ensor hereunder, which is properly payable by Customer, and after Customer has m
+    et withholding requirements, Customer shall pay to Licensor on demand the full a
+    mount of such additional withholding or intercepted payment.
+
+    17. GENERAL
+
+    17.1. Governing Law. The validity, construction and interpretatio...
+    ```
+*   **EXPECTED GROUND TRUTH (GT)**:
+    ```
+    The validity, construction and interpretation of this Agreement and the rights and duties of the parties hereto shall be governed by the internal laws of the State of New York, excluding its principles of conflict of laws.
+    ```
+*   **BEFORE SFT (Zero-Shot Base Model)**:
+    ```
+    17.1. Governing Law. The validity, construction and interpretation of this Agreement and the rights and duties of the parties hereto shall be governed by the internal laws of the State of New York, excluding its principles of conflict of laws.
+    ```
+    *Fails exact match bounds because the base instruct model pulls in the surrounding section heading text "17.1. Governing Law.".*
+*   **AFTER SFT (Fine-Tuned LoRA Model)**:
+    ```
+    The validity, construction and interpretation of this Agreement and the rights and duties of the parties hereto shall be governed by the internal laws of the State of New York, excluding its principles of conflict of laws.
+    ```
+    *Perfectly aligns and trims segment bounds, matching the exact annotated substring.*
+
+See [cuad/experiments.md](cuad/experiments.md) for the complete 10-config hyperparameter sweeps matrix, representation capacity analysis, and additional SFT takeaways.
+
+
 ## Other Experiments
 
 ### Some Takeaways
@@ -215,6 +275,12 @@ To reproduce our Custom Syntax and Semantic classification sweeps, navigate to t
 │   ├── run_master_sweeps.py        # Sequential sweeps trainer + evaluator
 │   ├── run_full_epoch_sequel.py    # sequel scaled full epoch tuner
 │   └── inspect_processor.py        # processor structures and token budgets analyzer
+├── cuad/                           # Legal contract extraction SFT researchers namespace
+│   ├── finetune_cuad.py            # SFT training loops, boundary offset and validation evaluator
+│   ├── eval_cuad.py                # stand-alone greedy metrics EM/F1 validation solver
+│   ├── inference_demo.py           # comparative Zero-shot vs. SFT 5-contracts visual reporter CLI
+│   ├── experiments.md              # complete 10-config parameter sweeps audit table & insights
+│   └── implementation_plan.md      # parameters configuration proposal plan
 ├── examples/
 │   ├── inference.py                # Base model and merged safetensors formula inference text
 │   ├── finetune_gsm8k.py           # GSM8K QLoRA and fp16 trainer
