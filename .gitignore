@@ -162,7 +162,10 @@ unsloth_compiled_cache/
 
 # Training artifacts (LoRA adapters, checkpoints) produced by examples/
 lora_*/
+cuad/lora_*/
 models_litertlm/
+
+.jetskicli/
 
 # Spyder project settings
 .spyderproject
