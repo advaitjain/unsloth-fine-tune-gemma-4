@@ -1,17 +1,17 @@
 # Gemma 4 LaTeX OCR SFT Experiments Master-Record
 
-This document serves as the official master-record of all low-budget sweeps, master symmetrical grid sweeps, and scaled full-epoch SFT benchmark investigations executed in 16-bit precision (`fp16`) for **Gemma 4 E2B Vision SFT on LaTeX OCR**.
+This document serves as the official unified experiments master-record and benchmarks compiled for **Gemma 4 E2B Vision SFT on LaTeX OCR**.
 
 ---
 
-## 🏆 1. Best Performing LoRA Runs Summary
+## 🏆 1. Optimal Performing LoRA Runs & Evaluation Protocol
 
-Based on rigorous Symmetrical Sweeps across structural architectures, ranks, token budgets, and learning rates, we identified the following optimal configurations:
+Based on rigorous Symmetrical Sweeps across structural architectures, ranks, token budgets, and learning rates in 16-bit precision (`fp16`) on the RTX 4090, we identify the following optimal configurations:
 
-### 1.1. Best Scaled SFT Run (For Maximum Exact Mathematical transcription)
+### 1.1. Best Scaled SFT Run (For Maximum Perfect Exact Math transcription)
 *   **Run ID:** `P2_280_Full_Epoch`
 *   **Configuration:** Fully Trained (Vision + Lang adapters active)
-*   **Hyperparameters:** Rank $r=32$, Alpha $\alpha=64$, Learning Rate $5e-5$, Visual Tokens = 280, Steps: 8,585 (1 Full Epoch over all ~68k samples).
+*   **Hyperparameters:** Rank $r=32$, Alpha $\alpha=64$, Learning Rate $5e-5$, Visual Tokens = 280, Steps: 8,585 (1 Full Epoch).
 *   **Avg EM (N=50):** **14.00%** (Zero-shot Baseline: 6.00% — **an absolute +8.00% EM improvement!**)
 *   **Avg NED (N=50):** **68.39%**
 *   **Command to Train:**
@@ -30,53 +30,28 @@ Based on rigorous Symmetrical Sweeps across structural architectures, ranks, tok
     uv run python examples/finetune_vision.py --no-4bit --lora-rank 32 --lora-alpha 64 --learning-rate 5e-5 --vision-tokens 280 --max-steps 60 --output-dir lora_vision_sweep_best
     ```
 
-### 1.3. Best Visual Resolution Sweep (Protected Feature Extraction)
-*   **Run ID:** `P2_560_R32_LR55_VF`
-*   **Configuration:** Vision Frozen (`VF` — Lang adapter active, Vision encoder 100% locked).
-*   **Hyperparameters:** Rank $r=32$, Alpha $\alpha=64$, Learning Rate $5e-5$, Visual Tokens = 560, Steps: 60.
-*   **Avg EM (N=50):** **6.00%**
-*   **Avg NED (N=50):** **76.18%** (Baseline: 73.26% — **an absolute +2.92% NED improvement!**)
-*   **Command to Train:**
-    ```bash
-    uv run python examples/finetune_vision.py --no-4bit --lora-rank 32 --lora-alpha 64 --learning-rate 5e-5 --vision-tokens 560 --finetune-vision-layers False --max-steps 60 --output-dir lora_vision_560_best
-    ```
+---
+
+## 🛠️ 2. Evaluation Protocol: Computing EM & NED Scores
+
+To compute the Exact Match (EM) correctness rate and Normalized Edit Distance (NED) approximate similarity, researchers should run the standard vision evaluation script:
+
+```bash
+uv run python examples/eval_vision.py --model <adapter_or_model_path> --no-4bit --eval-rows 50 --vision-tokens <280_or_560>
+```
+
+### How Metrics are Derived:
+1.  **Greedy Decoding:** Eliminates sampling token noise (`do_sample=False`).
+2.  **Advanced Normalization Pipeline:** Ground Truth and predicted strings are normalized by stripping spacing, wrappers (`$$`, `$`, `\(`), mapping command short-hands (`\le` -> `\leq`, `\to` -> `\rightarrow`), and standardizing brace indexing subscripts (`x_i` -> `x_{i}`).
+3.  **Normalized Edit Distance (NED) Function:**
+    $$\text{NED} = 1 - \frac{\text{LevenshteinDistance}(\text{clean\_pred}, \text{clean\_true})}{\max(\text{len}(\text{clean\_pred}), \text{len}(\text{clean\_true}))}$$
+4.  **Exact Match (EM):** Returns `1.0` if normalized prediction matches normalized ground truth 100% exactly; returns `0.0` otherwise.
 
 ---
 
-## 2. Methodology & Evaluation Protocol
+## 📊 3. Master Symmetrical Sweeps results Table (50 Samples)
 
-To ensure high-precision metric compilation:
-1.  **Deterministic Greedy Decoding:** Eliminates sampling noise (`do_sample=False`).
-2.  **Advanced LaTeX Normalization:** Ground Truths (GT) and predictions are stripped of whitespace, display math wrapper wrappers (`$$`, `$`), equivalent commands unified (`\le` -> `\leq`, `\to` -> `\rightarrow`), and brace subscripts standardized (`x_i` -> `x_{i}`).
-3.  **Scoring:** Normalized Exact Match (EM) for mathematical correctness, and Levenshtein-based Normalized Edit Distance (NED) for relative similarity.
-
----
-
-## 3. Phase 1: Low Budget Symmetrical Sweeps (N=30 Validation Samples)
-
-Phase 1 evaluated short-budget setups under the default visual sequence length of **280 visual tokens** on an evaluation set size of **30 samples**:
-
-### 3.1. Symmetrical Phase 1 results Table
-
-| Run ID | Sweep Focus | Vision Layers | Steps | Learning Rate | Avg EM (N=30) | Avg NED (N=30) | Peak VRAM | Training Time |
-|---|---|---|---|---|---|---|---|---|
-| **V0** | **Baseline** | — | — | — | **0.00%** | **71.57%** | ~10.5 GB | — |
-| **V1_Trained** | **Reference** | Trained | 60 | $2e-4$ | **3.33%** | **72.22%** | ~11.7 GB | 2.5 min |
-| **V1_Frozen** | **Reference Frozen**| Frozen | 60 | $2e-4$ | **0.00%** | **72.28%** | ~11.7 GB | 1.9 min |
-| **V2_Trained** | **High Capacity** | Trained | 60 | $2e-4$ | **6.67%** | **71.34%** | ~11.7 GB | 2.5 min |
-| **V2_Frozen** | **High Capacity Frz**| Frozen | 60 | $2e-4$ | **0.00%** | **73.39%** | ~11.7 GB | 1.9 min |
-| **V3_Trained** | **Lower LR** | Trained | 60 | $1e-4$ | **0.00%** | **74.76%** | ~11.7 GB | 2.45 min |
-| **V3_Frozen** | **Lower LR Frozen** | Frozen | 60 | $1e-4$ | **3.33%** | **75.03%** | ~11.7 GB | 1.9 min |
-| **V4_Trained** | **Extended Budget** | Trained | 120 | $2e-4$ | **3.33%** | **65.63%** | ~11.7 GB | 4.7 min |
-| **V4_Frozen** | **Extended Frozen** | Frozen | 120 | $2e-4$ | **3.33%** | **68.58%** | ~11.7 GB | 3.6 min |
-
----
-
-## 4. Phase 2: Master Symmetrical Benchmark Sweeps (N=50 Validation Samples)
-
-Phase 2 expanded evaluation to **50 samples** and explored structural combinations across **280 vs 560 visual tokens**, locking LoRA Alpha scaling to `lora_alpha = 2 * lora_rank` natively, and adding Projector-Only (PO) training:
-
-### 4.1. Master SFT Benchmark results Grid
+Systematic Low-budget SFT parameter sweeps comparing Fully Trained, Vision Frozen (`VF`), Language Frozen (`LF`), and Projector-Only (`PO`) LoRA adapters under standard (280) vs high-res (560) token budgets over **50 test samples**:
 
 | Run ID | Token Budget | SFT Config | Rank ($r$) | Alpha ($\alpha$) | LR | Avg EM (N=50) | $\Delta$ EM | Avg NED (N=50) | $\Delta$ NED |
 |---|---|---|---|---|---|---|---|---|---|
@@ -133,13 +108,11 @@ Phase 2 expanded evaluation to **50 samples** and explored structural combinatio
 
 ---
 
-## 5. Scaled Full-Epoch SFT Results (16-bit fp16, LR $5e-5$, $r=32$, Fully Trained)
+## 4. Scaled Full-Epoch SFT results (16-bit fp16, LR $5e-5$, $r=32$, Fully Trained)
 
-To benchmark the ultimate alignment capacity of our peak-performing configuration, we scaled the SFT SFT budget to **1 full epoch** over all ~68k samples (effective batch size 8 = 8,585 steps) under both 280 and 560 visual token budgets:
+Benchmarks of the scaled 1-epoch trainings over the entire training set:
 
 | Run ID | Token Budget | Config | Rank ($r$) | Alpha ($\alpha$) | LR | Avg EM (N=50) | $\Delta$ EM | Avg NED (N=50) | $\Delta$ NED | Train Runtime |
 |---|---|---|---|---|---|---|---|---|---|---|
-| **V0_280** | 280 | Baseline | — | — | — | **6.00%** | *Baseline* | **73.65%** | *Baseline* | — |
-| **V0_560** | 560 | Baseline | — | — | — | **6.00%** | *Baseline* | **73.26%** | *Baseline* | — |
 | **P2_280_Full_Epoch** | 280 | Fully Trained | 32 | 64 | $5e-5$ | **14.00%**| **+8.00%**| **68.39%** | -5.26% | 5.23 hours |
 | **P2_560_Full_Epoch** | 560 | Fully Trained | 32 | 64 | $5e-5$ | **12.00%**| **+6.00%**| **64.46%** | -8.80% | 6.72 hours |
