@@ -1,10 +1,142 @@
 # unsloth-fine-tune-gemma-4
 
-Worked examples of [Unsloth](https://github.com/unslothai/unsloth) on Gemma 4 E2B for causal inference, baselines, and Supervised Fine-Tuning (SFT) sweeps.
+Worked examples of [Unsloth](https://github.com/unslothai/unsloth) on Gemma 4 E2B.
 
 ---
 
-## Key Empirical Takeaways
+## Getting Started
+
+### Hardware Requirements
+
+* **NVIDIA GPU with at least 16 GB of VRAM is required**.
+  - **Base Inference**: 4-bit E2B requires **8.3 GB**, and 16-bit fp16 E2B requires **10.3 GB** of VRAM.
+  - **SFT LoRA Training**: Standard 16-bit full-precision SFT adapter training requires **11.7 GB** of VRAM.
+  - This repo has been tested and benchmarked on a single **NVIDIA GeForce RTX 4090 (24 GB VRAM)**.
+
+
+### Environment Setup
+
+We use `uv` for virtual environment and dependency management.
+
+```bash
+# 1. Create virtual environment and sync dependencies
+uv sync
+
+# 2. Authenticate Hugging Face CLI to download gated weights
+uv run hf auth login
+
+# 3. Download the E2B model directly into the shared HF cache (~/.cache/huggingface)
+HF_HUB_ENABLE_HF_TRANSFER=1 uv run hf download unsloth/gemma-4-E2B-it-unsloth-bnb-4bit
+```
+
+### Inference Smoke Test
+
+Ensure the base model streams completions successfully:
+
+```bash
+uv run python examples/inference.py
+```
+*Expectation*: Streams the answer to *"What is the capital of France?"*. Pass `--prompt "..."` or `--model <hf-id>` to customize.
+
+---
+
+## Multimodal LaTeX OCR SFT
+
+Re-implementation of Unsloth's [Gemma 4 Training Guide](https://unsloth.ai/docs/models/gemma-4/train)
+
+```bash
+# A. Run zero-shot base model baseline (N=50)
+uv run python examples/eval_vision.py --model unsloth/gemma-4-E2B-it --no-4bit --eval-rows 50 --vision-tokens 280
+
+# B. Train 16-bit fp16 SFT peak-LoRA adapter (r=32, alpha=64, LR 5e-5, 280 tokens)
+uv run python examples/finetune_vision.py \
+  --model unsloth/gemma-4-E2B-it \
+  --no-4bit \
+  --lora-rank 32 \
+  --lora-alpha 64 \
+  --learning-rate 5e-5 \
+  --vision-tokens 280 \
+  --max-steps 60 \
+  --output-dir lora_vision_best
+
+# C. Evaluate the trained SFT adapter
+uv run python examples/eval_vision.py --model lora_vision_best/ --no-4bit --eval-rows 50 --vision-tokens 280
+
+# D. Merge LoRA adapters back into base weights to produce a 16-bit safetensors directory
+uv run python examples/merge_lora.py --adapter lora_vision_best --output-dir lora_vision_merged_fp16
+
+# E. Run streaming formula inference on a sample local image using the merged standalone safetensors
+uv run python examples/inference.py --model lora_vision_merged_fp16/
+```
+
+#### Qualitative Fine-Tuning Delta (Before vs. After SFT):
+
+To render these LaTeX formula strings directly in your terminal local environment, run:
+```bash
+# Setup tool once
+uv tool install texicode
+# Render formula
+txc "<latex_formula_string>"
+```
+
+##### 1. Visual Symbol Resolution (Alpha vs. English 'a')
+
+*   **Input Image**:
+    ![sample_1.png](examples/sample_1.png)
+*   **EXPECTED GROUND TRUTH (GT)**:
+    ```latex
+    \omega _ { a b } ^ { \alpha \beta } ( x , y ) = m ^ { 2 } \epsilon ^ { \alpha \beta } \delta ^ { a b } \delta ( x - y )
+    ```
+*   **BEFORE SFT (Zero-Shot Base Model)**:
+    ```latex
+    \omega_{ab}^{a\beta}(x,y) = m^2 \epsilon^{a\beta} \delta^{ab} \delta(x-y)
+    ```
+*   **AFTER SFT (Fine-Tuned Peak LoRA Model)**:
+    ```latex
+    \omega_{ab}^{\alpha\beta}(x, y) = m^2 \epsilon^{\alpha\beta} \delta^{ab} \delta(x - y)
+    ```
+    *Uses mathematical Greek \alpha letter instead of a.*
+
+##### 2. Detail Omission Prevention (Compose Circle `\circ`)
+
+*   **Input Image**:
+    ![sample_2.png](examples/sample_2.png)
+*   **EXPECTED GROUND TRUTH (GT)**:
+    ```latex
+    \nabla _ { \mu } = T \circ \partial _ { \mu } \circ T ^ { + } + \Pi \circ \partial _ { \mu } \circ \Pi + \rho _ { \mu }
+    ```
+*   **BEFORE SFT (Zero-Shot Base Model)**:
+    ```latex
+    \nabla_{\mu} = T \circ \partial_{\mu} T^{+} + \Pi \circ \partial_{\mu} \Pi + \rho_{\mu}
+    ```
+*   **AFTER SFT (Fine-Tuned Peak LoRA Model)**:
+    ```latex
+    \text{\nabla}_{\mu} = T \circ \partial_{\mu} \circ T^{+} + \Pi \circ \partial_{\mu} \circ \Pi + \rho_{\mu}
+    ```
+    *Preserves mathematical compose circle \circ operators.*
+
+##### 3. Mathematical Syntax Alignment (`\cdots` vs. `\dots`)
+
+*   **Input Image**:
+    ![sample_3.png](examples/sample_3.png)
+*   **EXPECTED GROUND TRUTH (GT)**:
+    ```latex
+    n _ { i } = m _ { i } + m _ { i + 1 } + \cdots + m _ { N - 1 } + n _ { N } .
+    ```
+*   **BEFORE SFT (Zero-Shot Base Model)**:
+    ```latex
+    n_i = m_i + m_{i+1} + \dots + m_{N-1} + n_N.
+    ```
+*   **AFTER SFT (Fine-Tuned Peak LoRA Model)**:
+    ```latex
+    n_i = m_i + m_{i+1} + \cdots + m_{N-1} + n_N.
+    ```
+    *Replaces common text lower ellipsis with math centered dots \cdots.*
+
+
+## Other Experiments
+
+### Some Takeaways
 
 Across three distinct text-only tasks (GSM8K math, Regex semantic parsing, and Emotion classification), **SFT on highly capable instruction-tuned LLMs (Gemma 4 E2B) consistently underperforms Zero-Shot baseline prompting**. We observed three distinct limiting dynamics:
 
@@ -24,47 +156,6 @@ Across three distinct text-only tasks (GSM8K math, Regex semantic parsing, and E
    - Manual trace audits revealed that the model's "mismatches" were actually highly logical, conceptually correct classifications (e.g., mapping `"i feel so cold"` to `sadness` instead of the gold label `anger`, or `"friendly affection"` to `love` instead of the gold label `joy`).
    - Because E2B maintains a rigid pre-trained semantic logic under gentle SFT, it refuses to overfit to noisy, inconsistent human annotations, limiting its exact-match accuracy improvement.
    - See [experimental/README.md](experimental/README.md) for the Emotion study.
-
----
-
-## Hardware Requirements
-
-* **NVIDIA GPU with at least 16 GB of VRAM is required**.
-  - **Base Inference**: 4-bit E2B requires **8.3 GB**, and 16-bit fp16 E2B requires **10.3 GB** of VRAM.
-  - **SFT LoRA/QLoRA Training**: Standard 16-bit full-precision SFT adapter training requires **11.7 GB** of VRAM.
-  - Triton compiler memory overhead during kernel warmup requires the remaining VRAM headroom. This repo has been tested and benchmarked on a single **NVIDIA GeForce RTX 4090 (24 GB VRAM)**.
-
----
-
-## Getting Started
-
-### 1. Environment Setup
-
-We use `uv` for virtual environment and dependency management.
-
-```bash
-# 1. Create virtual environment and sync dependencies
-uv sync
-
-# 2. Authenticate Hugging Face CLI to download gated weights
-uv run hf auth login
-
-# 3. Download the E2B model directly into the shared HF cache (~/.cache/huggingface)
-HF_HUB_ENABLE_HF_TRANSFER=1 uv run hf download unsloth/gemma-4-E2B-it-unsloth-bnb-4bit
-```
-
-### 2. Causal Inference Smoke Test
-
-Ensure the base model streams completions successfully:
-
-```bash
-uv run python examples/inference.py
-```
-*Expectation*: Streams the answer to *"What is the capital of France?"*. Pass `--prompt "..."` or `--model <hf-id>` to customize.
-
----
-
-## Reproducing the Results
 
 All SFT training scripts and systematic evaluators are fully structured and parameterized as CLI flags.
 
@@ -109,97 +200,6 @@ uv run python examples/eval_gsm8k_automated.py --adapter lora_gsm8k_fp16_s1/ --n
 ### 2. Regex and Emotion Evals (Experimental Folder)
 To reproduce our Custom Syntax and Semantic classification sweeps, navigate to the `experimental/` directory. See [experimental/README.md](experimental/README.md) for exact commands and execution instructions.
 
-### 3. Multimodal LaTeX OCR SFT (RTX 4090)
-To reproduce our peak-performing high-capacity LaTeX OCR visual tuning benchmarks:
-
-```bash
-# A. Run zero-shot base model baseline (N=50)
-uv run python examples/eval_vision.py --model unsloth/gemma-4-E2B-it --no-4bit --eval-rows 50 --vision-tokens 280
-
-# B. Train 16-bit fp16 SFT peak-LoRA adapter (r=32, alpha=64, LR 5e-5, 280 tokens)
-uv run python examples/finetune_vision.py \
-  --model unsloth/gemma-4-E2B-it \
-  --no-4bit \
-  --lora-rank 32 \
-  --lora-alpha 64 \
-  --learning-rate 5e-5 \
-  --vision-tokens 280 \
-  --max-steps 60 \
-  --output-dir lora_vision_best
-
-# C. Evaluate the trained SFT adapter
-uv run python examples/eval_vision.py --model lora_vision_best/ --no-4bit --eval-rows 50 --vision-tokens 280
-
-# D. Merge LoRA adapters back into base weights to produce a 16-bit safetensors directory
-uv run python examples/merge_lora.py --adapter lora_vision_best --output-dir lora_vision_merged_fp16
-
-# E. Run streaming formula inference on a sample local image using the merged standalone safetensors
-uv run python examples/inference.py --model lora_vision_merged_fp16/
-```
-
-#### Qualitative Fine-Tuning Delta (Before vs. After SFT):
-
-To render these LaTeX formula strings directly in your terminal local environment, run:
-```bash
-# Setup tool once
-uv tool install texicode
-# Render formula
-uv run texicode "<latex_formula_string>"
-```
-
-##### 1. Visual Symbol Resolution (Alpha vs. English 'a')
-
-*   **Input Image**: 
-    ![sample_1.png](examples/sample_1.png)
-*   **EXPECTED GROUND TRUTH (GT)**:
-    ```latex
-    \omega _ { a b } ^ { \alpha \beta } ( x , y ) = m ^ { 2 } \epsilon ^ { \alpha \beta } \delta ^ { a b } \delta ( x - y )
-    ```
-*   **BEFORE SFT (Zero-Shot Base Model)**:
-    ```latex
-    \omega_{ab}^{a\beta}(x,y) = m^2 \epsilon^{a\beta} \delta^{ab} \delta(x-y)
-    ```
-    *Description*: *Fixes representational bottleneck, resolving handwriting curvature into mathematical Greek \alpha letter.*
-*   **AFTER SFT (Fine-Tuned Peak LoRA Model)**:
-    ```latex
-    $$\omega_{ab}^{\alpha\beta}(x, y) = m^2 \epsilon^{\alpha\beta} \delta^{ab} \delta(x - y)$$
-    ```
-
-##### 2. Detail Omission Prevention (Compose Circle `\circ`)
-
-*   **Input Image**: 
-    ![sample_2.png](examples/sample_2.png)
-*   **EXPECTED GROUND TRUTH (GT)**:
-    ```latex
-    \nabla _ { \mu } = T \circ \partial _ { \mu } \circ T ^ { + } + \Pi \circ \partial _ { \mu } \circ \Pi + \rho _ { \mu }
-    ```
-*   **BEFORE SFT (Zero-Shot Base Model)**:
-    ```latex
-    \nabla_{\mu} = T \circ \partial_{\mu} T^{+} + \Pi \circ \partial_{\mu} \Pi + \rho_{\mu}
-    ```
-    *Description*: *Restores details omission, preserving crucial mathematical compose circle \circ operators.*
-*   **AFTER SFT (Fine-Tuned Peak LoRA Model)**:
-    ```latex
-    $$\text{\nabla}_{\mu} = T \circ \partial_{\mu} \circ T^{+} + \Pi \circ \partial_{\mu} \circ \Pi + \rho_{\mu}$$
-    ```
-
-##### 3. Mathematical Syntax Alignment (`\cdots` vs. `\dots`)
-
-*   **Input Image**: 
-    ![sample_3.png](examples/sample_3.png)
-*   **EXPECTED GROUND TRUTH (GT)**:
-    ```latex
-    n _ { i } = m _ { i } + m _ { i + 1 } + \cdots + m _ { N - 1 } + n _ { N } .
-    ```
-*   **BEFORE SFT (Zero-Shot Base Model)**:
-    ```latex
-    n_i = m_i + m_{i+1} + \dots + m_{N-1} + n_N.
-    ```
-    *Description*: *Standardizes predictions, replacing common text lower ellipsis with math centered dots \cdots.*
-*   **AFTER SFT (Fine-Tuned Peak LoRA Model)**:
-    ```latex
-    $$n_i = m_i + m_{i+1} + \cdots + m_{N-1} + n_N.$$
-    ```
 
 ---
 
