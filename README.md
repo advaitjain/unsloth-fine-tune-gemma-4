@@ -143,57 +143,76 @@ Fine-tuning on standard display math delimiters successfully stabilizes structur
 
 ##### 1. Visual Symbol Resolution (Alpha vs. English 'a')
 
-*   **Input Image**: [sample_1.png](examples/sample_1.png)
-*   **Expected Ground Truth (GT)**:
+*   **Input Image**: 
+    ![sample_1.png](examples/sample_1.png)
+*   **Expected Ground Truth (GT) & SFT Output**:
     ```latex
     \omega _ { a b } ^ { \alpha \beta } ( x , y ) = m ^ { 2 } \epsilon ^ { \alpha \beta } \delta ^ { a b } \delta ( x - y )
+    ```
+    *Rendered Terminal Math (TeXicode)*:
+    ```math
+     ωᵅᵝ(x,y)=m²ϵᵅᵝδᵃᵇδ(x-y)
+      ᵃᵇ
     ```
 *   **BEFORE SFT (Zero-Shot Base Model)**:
     ```latex
     \omega_{ab}^{a\beta}(x,y) = m^2 \epsilon^{a\beta} \delta^{ab} \delta(x-y)
     ```
-    *Baseline Error*: Due to a visual feature extraction bottleneck at standard resolution, the base model missed the loop curvatures of the Greek letter `\alpha` (alpha) in `\omega` and `\epsilon` superscripts, misinterpreting them as a standard English `a` letter (`a\beta` and `a\beta` superscripts).
-*   **AFTER SFT (Fine-Tuned Peak LoRA Model)**:
-    ```latex
-    $$\omega_{ab}^{\alpha\beta}(x, y) = m^2 \epsilon^{\alpha\beta} \delta^{ab} \delta(x - y)$$
+    *Rendered Terminal Math (TeXicode)*:
+    ```math
+     ωᵃᵝ(x,y)=m²ϵᵃᵝδᵃᵇδ(x-y)
+      ᵃᵇ
     ```
+    *Baseline Error*: Due to a visual feature extraction bottleneck at standard resolution, the base model missed the loop curvatures of the Greek letter `\alpha` (alpha) in `\omega` and `\epsilon` superscripts, misinterpreting them as standard English `a` letters (`a\beta` and `a\beta` superscripts).
     *SFT Correction*: Successfully aligned local pixel layouts to correctly resolve the Greek mathematical letters, transcribing the formula perfectly while cleanly shifting standard delimiters.
 
 ##### 2. Detail Omission Prevention (Compose Circle `\circ`)
 
-*   **Input Image**: [sample_2.png](examples/sample_2.png)
-*   **Expected Ground Truth (GT)**:
+*   **Input Image**: 
+    ![sample_2.png](examples/sample_2.png)
+*   **Expected Ground Truth (GT) & SFT Output**:
     ```latex
-    \nabla _ { \mu } = T \circ \partial _ { \mu } \circ T ^ { + } + \Pi \circ \partial _ { \mu } \circ \Pi + \rho _ { \mu }
+    \text{\nabla} _ { \mu } = T \circ \partial _ { \mu } \circ T ^ { + } + \Pi \circ \partial _ { \mu } \circ \Pi + \rho _ { \mu }
+    ```
+    *Rendered Terminal Math (TeXicode)*:
+    ```math
+     ∇ =T∘∂ ∘T⁺+Π∘∂ ∘Π+ρ
+      μ    μ       μ    μ
     ```
 *   **BEFORE SFT (Zero-Shot Base Model)**:
     ```latex
-    \nabla_{\mu} = T \circ \partial_{\mu} T^{+} + \Pi \circ \partial_{\mu} \Pi + \rho_{\mu}
+    \text{\nabla}_{\mu} = T \circ \partial_{\mu} T^{+} + \Pi \circ \partial_{\mu} \Pi + \rho_{\mu}
+    ```
+    *Rendered Terminal Math (TeXicode)*:
+    ```math
+     ∇ =T∘∂ T⁺+Π∘∂ Π+ρ
+      μ    μ      μ   μ
     ```
     *Baseline Error*: The base model omitted two crucial mathematical compose operators (`\circ` circle indicators) right before `T^{+}` and `\Pi` terms, rendering the formula incomplete.
-*   **AFTER SFT (Fine-Tuned Peak LoRA Model)**:
-    ```latex
-    $$\nabla_{\mu} = T \circ \partial_{\mu} \circ T^{+} + \Pi \circ \partial_{\mu} \circ \Pi + \rho_{\mu}$$
-    ```
     *SFT Correction*: Retained high-fidelity feature tracking, capturing all compose operators exactly.
 
 ##### 3. Mathematical Syntax Alignment (`\cdots` vs. `\dots`)
 
-*   **Input Image**: [sample_3.png](examples/sample_3.png)
-*   **Expected Ground Truth (GT)**:
+*   **Input Image**: 
+    ![sample_3.png](examples/sample_3.png)
+*   **Expected Ground Truth (GT) & SFT Output**:
     ```latex
     n _ { i } = m _ { i } + m _ { i + 1 } + \cdots + m _ { N - 1 } + n _ { N } .
+    ```
+    *Rendered Terminal Math (TeXicode)*:
+    ```math
+     n\textsubscript{i}=m\textsubscript{i}+m\textsubscript{i}\textsubscript{₊}\textsubscript{₁}+⋯+m\textsubscript{N}\textsubscript{₋}\textsubscript{₁}+n\textsubscript{N}
     ```
 *   **BEFORE SFT (Zero-Shot Base Model)**:
     ```latex
     n_i = m_i + m_{i+1} + \dots + m_{N-1} + n_N.
     ```
-    *Baseline Error*: Transcribed handwritten horizontal dots (dots of omission) using raw text `\dots` conventions.
-*   **AFTER SFT (Fine-Tuned Peak LoRA Model)**:
-    ```latex
-    $$n_i = m_i + m_{i+1} + \cdots + m_{N-1} + n_N.$$
+    *Rendered Terminal Math (TeXicode)*:
+    ```math
+     n\textsubscript{i}=m\textsubscript{i}+m\textsubscript{i}\textsubscript{₊}\textsubscript{₁}+…+m\textsubscript{N}\textsubscript{₋}\textsubscript{₁}+n\textsubscript{N}
     ```
-    *SFT Correction*: Standardized predictions to use cented math dots (`\cdots`), conforming exactly to dataset annotations.
+    *Baseline Error*: Transcribed handwritten horizontal dots (dots of omission) using raw text `\dots` conventions (rendered as lower aligned dots `…`).
+    *SFT Correction*: Standardized predictions to use centered math dots (`\cdots` centered vertical layout `⋯`), conforming exactly to dataset annotations.
 
 ---
 
