@@ -13,6 +13,13 @@ keep examples small, runnable, and explicit about VRAM costs.
 User-facing docs live in `README.md`. Experiment design and historical
 results live in `experiments.md`. This file is for agents.
 
+### Codebase Map
+*   **Text SFT & Math Reasoning**: [examples/finetune_gsm8k.py](file:///usr/local/google/home/advaitjain/github/unsloth-fine-tune-gemma-4/examples/finetune_gsm8k.py) (runs structured math tuning templates), [examples/eval_gsm8k.py](file:///usr/local/google/home/advaitjain/github/unsloth-fine-tune-gemma-4/examples/eval_gsm8k.py) (greedy decoding adapter test runner), [examples/eval_gsm8k_automated.py](file:///usr/local/google/home/advaitjain/github/unsloth-fine-tune-gemma-4/examples/eval_gsm8k_automated.py) (automated evaluation over custom splits).
+*   **Vision SFT (LaTeX OCR)**: [examples/finetune_vision.py](file:///usr/local/google/home/advaitjain/github/unsloth-fine-tune-gemma-4/examples/finetune_vision.py) (VLM supervised fine-tuning loop), [examples/eval_vision.py](file:///usr/local/google/home/advaitjain/github/unsloth-fine-tune-gemma-4/examples/eval_vision.py) (Exact Match and Normalized Edit Distance vision verification pipeline).
+*   **Compiled Edge Execution (LiteRT-LM)**: [examples/litert_lm_inference.py](file:///usr/local/google/home/advaitjain/github/unsloth-fine-tune-gemma-4/examples/litert_lm_inference.py) (runs compiled `.litertlm` models with CPU/GPU dynamic fallbacks).
+*   **Weight Merging**: [examples/merge_lora.py](file:///usr/local/google/home/advaitjain/github/unsloth-fine-tune-gemma-4/examples/merge_lora.py) (merges adapters to full 16-bit precision safetensors).
+*   **Experimental Sandbox**: [experimental/README.md](file:///usr/local/google/home/advaitjain/github/unsloth-fine-tune-gemma-4/experimental/README.md) (task studies: mapping [experimental/train_regex.py](file:///usr/local/google/home/advaitjain/github/unsloth-fine-tune-gemma-4/experimental/train_regex.py) for custom formats and [experimental/train_emotion.py](file:///usr/local/google/home/advaitjain/github/unsloth-fine-tune-gemma-4/experimental/train_emotion.py) for boundary semantic matching studies).
+
 ## Hard constraint: 6 GB VRAM
 
 Every default in the repo is chosen to fit. Before adding or changing
@@ -45,8 +52,7 @@ anything, verify:
 
 ## Code conventions (match existing style)
 
-Look at `examples/inference.py` and `examples/finetune_gsm8k.py` for the
-canonical shape. In particular:
+Look at [examples/inference.py](file:///usr/local/google/home/advaitjain/github/unsloth-fine-tune-gemma-4/examples/inference.py) and [examples/finetune_gsm8k.py](file:///usr/local/google/home/advaitjain/github/unsloth-fine-tune-gemma-4/examples/finetune_gsm8k.py) for the canonical shape. In particular:
 
 - Module-level docstring describing what the script does and any non-obvious
   CLI usage. Keep it short — a few lines, not a tutorial.
@@ -56,26 +62,73 @@ canonical shape. In particular:
   (`-m/--model`, `-a/--adapter`, `-p/--prompt`).
 - `def main() -> None:` plus `if __name__ == "__main__": main()`.
 - Type hints on function signatures and helper return types.
-- Use `unsloth.FastModel` (not `FastLanguageModel`) for loading. It works
-  for both text-only Gemma 3 1B and multimodal Gemma 4. Don't switch
-  loaders without a reason.
-- Chat messages use the multimodal-list content format:
-  ```python
-  [{"role": "user", "content": [{"type": "text", "text": prompt}]}]
-  ```
-  This works across all the Gemma variants in this repo. Plain string
-  `content` works for text-only Gemma 3 too but is inconsistent with the
-  rest of the codebase.
-- Gemma's chat template uses role `"model"`, **not** `"assistant"`.
-  `<start_of_turn>user / model` are the turn markers used by
-  `train_on_responses_only`.
-- Default sampling for chat: `temperature=1.0, top_p=0.95, top_k=64` (the
-  Gemma team's recommendation). Default sampling for **reasoning / math
-  evals**: greedy (`do_sample=False`). Don't mix these up.
-- Comments only when the *why* is non-obvious. Don't narrate what the code
-  is doing line-by-line.
-- Don't add docs files, READMEs in subdirectories, or planning notes
-  unless the user asks.
+- **Model Loading Conventions**:
+  - Use generic `unsloth.FastModel` for standard loading and merging scripts, as it covers both text and vision models natively.
+  - Use `unsloth.FastVisionModel` for vision training entry-points. Avoid using standard transformers loaders to guarantee Unsloth optimizations.
+- **Multimodal / Vision Configuration**:
+  - The target visual sequence defaults to 280 soft tokens.
+  - To customize soft visual budgets dynamically, you must implement synchronization overrides directly on both the Model and Processor config objects:
+    ```python
+    # 1. Modify Model Config
+    model.config.vision_soft_tokens_per_image = args.vision_tokens
+    model.config.vision_config.default_output_length = args.vision_tokens
+    # 2. Modify Processor Config
+    processor.image_processor.image_seq_length = args.vision_tokens
+    processor.image_processor.max_soft_tokens = args.vision_tokens
+    ```
+- **Chat Templates & Turn Marker Alignment**:
+  - Chat messages utilize the multimodal list structure:
+    ```python
+    [{"role": "user", "content": [{"type": "text", "text": prompt}]}]
+    ```
+  - Role configurations use string `"model"`, **never** `"assistant"`.
+  - Gemma 4 turn templates utilize `<|turn>user\n` and `<|turn>model\n`.
+  - Gemma 3 utilizes standard `<start_of_turn>user\n` and `<start_of_turn>model\n`.
+  - Ensure correct response masking triggers with `train_on_responses_only`:
+    ```python
+    if "gemma-4" in model_name.lower():
+        instruction_part = "<|turn>user\n"
+        response_part = "<|turn>model\n"
+    else:
+        instruction_part = "<start_of_turn>user\n"
+        response_part = "<start_of_turn>model\n"
+    ```
+- **LiteRT-LM Compiled Execution**:
+  - Load pre-compiled `.litertlm` models via `litert_lm.Engine`.
+  - Handle GPU vision falls context safely to guard execution against FFI initialization failures:
+    ```python
+    try:
+        engine = litert_lm.Engine(model_path=path, backend=litert_lm.Backend.CPU, vision_backend=litert_lm.Backend.GPU)
+    except RuntimeError:
+        engine = litert_lm.Engine(model_path=path, backend=litert_lm.Backend.CPU, vision_backend=litert_lm.Backend.CPU)
+    ```
+  - Standard terminal math renders via `texicode.pipeline.render_tex` using raw context:
+    ```python
+    import texicode.pipeline as tp
+    rendered = tp.render_tex(latex_string, False, True, "raw", {"fonts": "normal"})
+    ```
+- Sampling protocols: Default sampling for chat loops recommendation is `temperature=1.0, top_p=0.95, top_k=64`. Logical reasoning reasoning and structured OCR mathematical evaluations require deterministic greedy settings: `do_sample=False`.
+- Comments only when the *why* is non-obvious. Don't narrate the obvious.
+- Don't add docs files, READMEs in subdirectories, or planning notes.
+
+## Quantitative Evaluation & Normalization
+
+To calculate precise comparative scores, predictions and gold strings must run through strict normalization procedures before validation tests are checked. Baseline evaluations use:
+
+1.  **Regex-Based Math isolations**: Extract exact target calculations under robust patterns. Isolate specific `#### <answer>` formats, trailing measurements (e.g. weeks, hours, boxes), and format decimal conversions cleanly to avoid exact match rejection due to decimal notation style disparities (refer to `examples/eval_gsm8k_automated.py:extract_answer`).
+2.  **Visual LaTeX OCR Normalizations**: Space formatting characters and common commands must be standardized:
+    - Strip all white-spaces.
+    - Map shortcuts cleanly: `\le(?!q)` -> `\leq`, `\ge(?!q)` -> `\geq`, `\to` -> `\rightarrow`, `\epsilon` -> `\varepsilon`.
+    - Standardize braces subscript notation mappings: `_([a-zA-Z0-9]|\\[a-zA-Z]+)` -> `_{\1}` (e.g., `x_i` to `x_{i}`).
+    - Validate transcription consistency mathematically using **Exact Match (EM)** and **Normalized Edit Distance (NED)** (based on customized Levenshtein calculations) in [examples/eval_vision.py](file:///usr/local/google/home/advaitjain/github/unsloth-fine-tune-gemma-4/examples/eval_vision.py).
+
+## Experimental Insights & Hyperparameter Rules
+
+Review validated learning takeaways from past task studies in `experiments.md` and `experimental/README.md` before planning updates:
+
+- **The Alignment Tax constraint**: Applying training scripts over restrictive domains reduces baseline zero-shot capability parameters across overall cognitive outputs. Keep learning targets focused and verify scores relative to zero-shot baselines.
+- **The Generalization Bottleneck**: Model configurations under parameter limits (e.g., 1B base scales, rank $r=8$ adapters) lack capacity elements to formulate customized, brand new semantic syntaxes (such as LRegex logic structures). In these settings, training limits cause overfitting over prompt variations, while baseline English PCRE pre-trained priors dominate evaluation queries. Do not request small QLoRA updates for large architectural/syntactic structural transitions.
+- **Low-LR boundaries protecting reasoners**: When running semantic categorization tasks over noisy data categories, utilize low learning rates (such as $2e-5$) rather than standard settings ($2e-4$). This shields base weights from incorrect target designations while stabilizing capability boundaries (see `experimental/README.md` scientific audit).
 
 ## How to run things
 
@@ -86,32 +139,34 @@ uv run python examples/inference.py
 # GSM8K fine-tune end-to-end (BEFORE eval → train → AFTER eval → save adapter)
 uv run python examples/finetune_gsm8k.py
 
+# Vision SFT fine-tune over LaTeX OCR (enforces default 2x Alpha rule for rank)
+uv run python examples/finetune_vision.py --lora-rank 16 --vision-tokens 280 --output-dir lora_vision
+
 # Greedy eval of a saved adapter
 uv run python examples/eval_gsm8k.py --adapter lora_gsm8k/
+
+# VLM exact score evaluation (exact score comparisons across N samples)
+uv run python examples/eval_vision.py --model lora_vision/ --eval-rows 50
 ```
 
-`finetune_gsm8k.py` exposes all training knobs as CLI flags
-(`--max-steps`, `--train-rows`, `--lora-rank`, `--lora-alpha`,
-`--learning-rate`, `--warmup-steps`, `--lr-scheduler-type`,
-`--output-dir`). New experiments should be runnable from the command
-line — don't hard-code variants in the script.
+New execution variants and hyperparameter tuning operations should expose CLI commands rather than hardcoding variables into scripts.
 
 ## Verifying changes
 
 There is no test suite. Verify in this order:
 
-1. **Parse check** (no GPU needed):
-   ```bash
-   uv run python -c "import ast; ast.parse(open('examples/<file>.py').read()); print('OK')"
-   ```
-2. **End-to-end smoke run** with reduced settings:
-   ```bash
-   uv run python examples/finetune_gsm8k.py --max-steps 10 --train-rows 100 \
-     --output-dir /tmp/lora_smoke
-   ```
-   Expected: BEFORE eval prints, training loss decreases, AFTER eval prints,
-   adapter saved. Total ~2 min on a 6 GB GPU.
-3. **Reload check**: `uv run python examples/eval_gsm8k.py --adapter /tmp/lora_smoke`.
+1.  **Parse check** (no GPU needed):
+    ```bash
+    uv run python -c "import ast; ast.parse(open('examples/<file>.py').read()); print('OK')"
+    ```
+2.  **End-to-end smoke run** with reduced settings:
+    ```bash
+    uv run python examples/finetune_gsm8k.py --max-steps 10 --train-rows 100 \
+      --output-dir /tmp/lora_smoke
+    ```
+    Expected: BEFORE eval prints, training loss decreases, AFTER eval prints,
+    adapter saved. Total ~2 min on a 6 GB GPU.
+3.  **Reload check**: `uv run python examples/eval_gsm8k.py --adapter /tmp/lora_smoke`.
 
 For long training runs, launch via `Bash` with `run_in_background=true` and
 wait for the completion notification. Don't poll. Don't run a parallel
@@ -152,3 +207,4 @@ files explicitly with `git add <file>`; never `git add -A`/`.`.
   artifact glossary + full CLI flag reference.
 - `pyproject.toml` — dependency list and Python version range.
 - `examples/inference.py` — minimal `FastModel` reference; copy its style.
+- `experimental/README.md` — documentation and reproducing guides on custom parser sandbox models.
