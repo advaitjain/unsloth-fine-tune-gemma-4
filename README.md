@@ -194,7 +194,79 @@ SFT successfully trims surrounding text and heading numbers noise from raw gener
 See [cuad/experiments.md](cuad/experiments.md) for the complete 10-config hyperparameter sweeps matrix, representation capacity analysis, and additional SFT takeaways.
 
 
+## GSM8K Math SFT (Arithmetic Reasoning)
+
+Worked examples of causal language model supervised fine-tuning (SFT) for logical reasoning and multi-step word problem solving using the canonical [GSM8K (Grade School Math 8K)](https://github.com/openai/grade-school-math) dataset hosted on [Hugging Face](https://huggingface.co/datasets/openai/gsm8k).
+
+We fine-tune **Gemma 4 E2B** in full **16-bit precision (FP16)**, applying our optimal protective low learning rate ($1\times10^{-5}$) to integrate custom turn markers (`<|turn>user\n`) and structured prose without suffering catastrophic forgetting.
+
+```bash
+# A. Train 16-bit fp16 SFT peak-retention adapter (r=32, alpha=64, LR 1e-5, Cosine scheduler, 200 steps)
+uv run python gsm8k-math/finetune_gsm8k.py \
+  --model unsloth/gemma-4-E2B-it \
+  --no-4bit \
+  --lora-rank 32 \
+  --lora-alpha 64 \
+  --learning-rate 1e-5 \
+  --lr-scheduler-type cosine \
+  --train-rows 3000 \
+  --max-steps 200 \
+  --output-dir gsm8k-math/lora_exp17
+
+# B. Evaluate the trained LoRA adapter offline (greedy exact match verification over held-out test set)
+uv run python gsm8k-math/eval_gsm8k.py --adapter gsm8k-math/lora_exp17/ --no-4bit --eval-rows 100
+
+# C. Run interactive demonstrator comparing Zero-Shot base outputs vs. SFT adapter side-by-side
+uv run python gsm8k-math/inference_demo.py --adapter gsm8k-math/lora_exp17/
+```
+
+#### Qualitative Fine-Tuning Delta (Before vs. After SFT):
+
+SFT successfully trains the model to structure its logical reasoning into clean Markdown lists and explicit arithmetic formulas, matching the exact baseline accuracy without alignment degradation (**83.00% Exact Match**).
+
+##### 1. Structuring Multi-Step Arithmetic Formats (Janet's Ducks)
+
+*   **Input Word Problem**:
+    ```
+    Janet’s ducks lay 16 eggs per day. She eats three for breakfast every morning and bakes muffins for her friends every day with four. She sells the remainder at the farmers' market daily for $2 per fresh duck egg. How much in dollars does she make every day at the farmers' market?
+    ```
+*   **EXPECTED GROUND TRUTH (GT)**:
+    ```
+    18
+    ```
+*   **BEFORE SFT (Zero-Shot Base Model)**:
+    ```markdown
+    * Eggs remaining: 16 - 7 = 9 eggs
+    * She sells the remainder (9 eggs) at $2 per egg.
+    * Earnings: 9 \times $2 = $18
+    Answer: Janet makes $18 every day at the farmers' market.
+    ```
+    *Uses generic text symbols and informal suffix summaries.*
+*   **AFTER SFT (Fine-Tuned Peak LoRA Model)**:
+    ```markdown
+    Here's how to solve the problem step-by-step:
+
+    1. **Calculate the total number of eggs Janet has:**
+       Janet's ducks lay 16 eggs per day.
+
+    2. **Calculate the total number of eggs Janet uses:**
+       She eats 3 for breakfast + bakes 4 for friends = 3 + 4 = 7 eggs.
+
+    3. **Calculate the number of eggs remaining to sell:**
+       16 total eggs - 7 used eggs = 9 eggs remaining.
+
+    4. **Calculate the total money she makes:**
+       9 eggs * $2 per egg = $18
+
+    **Answer:** Janet makes **$18** every day at the farmers' market.
+    ```
+    *Perfectly structures enumerated steps, explicit addition/multiplication bounds, and clean bolded answers.*
+
+See [gsm8k-math/experiments.md](gsm8k-math/experiments.md) for the complete 18-experiment hyperparameter sweeps matrix, the alignment tax proof, and the low learning rate shield breakthrough.
+
+
 ## Other Experiments
+
 
 ### Some Takeaways
 
@@ -280,6 +352,12 @@ To reproduce our Custom Syntax and Semantic classification sweeps, navigate to t
 │   ├── eval_cuad.py                # stand-alone greedy metrics EM/F1 validation solver
 │   ├── inference_demo.py           # comparative Zero-shot vs. SFT 5-contracts visual reporter CLI
 │   ├── experiments.md              # complete 10-config parameter sweeps audit table & insights
+│   └── implementation_plan.md      # parameters configuration proposal plan
+├── gsm8k-math/                     # Arithmetic reasoning SFT researchers namespace
+│   ├── finetune_gsm8k.py           # SFT training loops, masked turn tokens and regex evaluator
+│   ├── eval_gsm8k.py               # stand-alone greedy exact match validation solver
+│   ├── inference_demo.py           # comparative Zero-shot vs. SFT 5-problems visual reporter CLI
+│   ├── experiments.md              # complete 18-experiment parameter sweeps audit table & insights
 │   └── implementation_plan.md      # parameters configuration proposal plan
 ├── examples/
 │   ├── inference.py                # Base model and merged safetensors formula inference text

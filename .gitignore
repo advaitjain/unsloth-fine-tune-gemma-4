@@ -163,6 +163,7 @@ unsloth_compiled_cache/
 # Training artifacts (LoRA adapters, checkpoints) produced by examples/
 lora_*/
 cuad/lora_*/
+gsm8k-math/lora_*/
 models_litertlm/
 
 .jetskicli/
