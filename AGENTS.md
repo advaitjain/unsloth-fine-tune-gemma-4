@@ -6,36 +6,34 @@ this repo. Read this before making changes.
 ## What this repo is
 
 Worked examples of [Unsloth](https://github.com/unslothai/unsloth) for
-inference and SFT on Gemma models. Sized end-to-end for a **6 GB consumer
-GPU** (RTX 4050 Laptop class). The reader's experience is the product —
+supervised fine-tuning (SFT) in full 16-bit precision (FP16) on **Gemma 4 E2B**
+models, followed by optimized edge deployment and evaluation using
+[LiteRT-LM](https://ai.google.dev/edge/litert-lm). Sized end-to-end for GPUs
+with **at least 16 GB of VRAM**. The reader's experience is the product —
 keep examples small, runnable, and explicit about VRAM costs.
 
 User-facing docs live in `README.md`. Experiment design and historical
-results live in `experiments.md`. This file is for agents.
+results live in feature-specific `experiments.md` files. This file is for agents.
 
 ### Codebase Map
-*   **Text SFT & Math Reasoning**: [examples/finetune_gsm8k.py](file:///usr/local/google/home/advaitjain/github/unsloth-fine-tune-gemma-4/examples/finetune_gsm8k.py) (runs structured math tuning templates), [examples/eval_gsm8k.py](file:///usr/local/google/home/advaitjain/github/unsloth-fine-tune-gemma-4/examples/eval_gsm8k.py) (greedy decoding adapter test runner), [examples/eval_gsm8k_automated.py](file:///usr/local/google/home/advaitjain/github/unsloth-fine-tune-gemma-4/examples/eval_gsm8k_automated.py) (automated evaluation over custom splits).
-*   **Vision SFT (LaTeX OCR)**: [examples/finetune_vision.py](file:///usr/local/google/home/advaitjain/github/unsloth-fine-tune-gemma-4/examples/finetune_vision.py) (VLM supervised fine-tuning loop), [examples/eval_vision.py](file:///usr/local/google/home/advaitjain/github/unsloth-fine-tune-gemma-4/examples/eval_vision.py) (Exact Match and Normalized Edit Distance vision verification pipeline).
-*   **Compiled Edge Execution (LiteRT-LM)**: [examples/litert_lm_inference.py](file:///usr/local/google/home/advaitjain/github/unsloth-fine-tune-gemma-4/examples/litert_lm_inference.py) (runs compiled `.litertlm` models with CPU/GPU dynamic fallbacks).
+*   **GSM8K SFT (Arithmetic Reasoning)**: [gsm8k-math/finetune_gsm8k.py](file:///usr/local/google/home/advaitjain/github/unsloth-fine-tune-gemma-4/gsm8k-math/finetune_gsm8k.py) (runs structured math tuning templates in full FP16 precision), [gsm8k-math/eval_gsm8k.py](file:///usr/local/google/home/advaitjain/github/unsloth-fine-tune-gemma-4/gsm8k-math/eval_gsm8k.py) (greedy decoding adapter test runner), [gsm8k-math/inference_demo.py](file:///usr/local/google/home/advaitjain/github/unsloth-fine-tune-gemma-4/gsm8k-math/inference_demo.py) (interactive side-by-side reporter).
+*   **CUAD SFT (Legal Contract Extraction)**: [cuad/finetune_cuad.py](file:///usr/local/google/home/advaitjain/github/unsloth-fine-tune-gemma-4/cuad/finetune_cuad.py) (PEFT adapter fine-tuning loop for governing law extraction), [cuad/eval_cuad.py](file:///usr/local/google/home/advaitjain/github/unsloth-fine-tune-gemma-4/cuad/eval_cuad.py) (standalone greedy metrics EM/F1 validation), [cuad/inference_demo.py](file:///usr/local/google/home/advaitjain/github/unsloth-fine-tune-gemma-4/cuad/inference_demo.py).
+*   **Vision SFT (LaTeX OCR)**: [latex_ocr/run_master_sweeps.py](file:///usr/local/google/home/advaitjain/github/unsloth-fine-tune-gemma-4/latex_ocr/run_master_sweeps.py) (sequential sweeps coordinator), [examples/finetune_vision.py](file:///usr/local/google/home/advaitjain/github/unsloth-fine-tune-gemma-4/examples/finetune_vision.py) (VLM supervised fine-tuning loop), [examples/eval_vision.py](file:///usr/local/google/home/advaitjain/github/unsloth-fine-tune-gemma-4/examples/eval_vision.py) (Exact Match and Normalized Edit Distance vision verification pipeline).
+*   **Compiled Edge Execution (LiteRT-LM)**: [litert-lm/README.md](file:///usr/local/google/home/advaitjain/github/unsloth-fine-tune-gemma-4/litert-lm/README.md) (conversion and runtime docs), [litert-lm/convert_and_eval.sh](file:///usr/local/google/home/advaitjain/github/unsloth-fine-tune-gemma-4/litert-lm/convert_and_eval.sh) (automated end-to-end pipeline script), [litert-lm/merge_adapter.py](file:///usr/local/google/home/advaitjain/github/unsloth-fine-tune-gemma-4/litert-lm/merge_adapter.py) (merges adapters to full precision safetensors), [litert-lm/eval_litert_gsm8k.py](file:///usr/local/google/home/advaitjain/github/unsloth-fine-tune-gemma-4/litert-lm/eval_litert_gsm8k.py) (evaluates compiled `.litertlm` models), and [examples/litert_lm_inference.py](file:///usr/local/google/home/advaitjain/github/unsloth-fine-tune-gemma-4/examples/litert_lm_inference.py).
 *   **Weight Merging**: [examples/merge_lora.py](file:///usr/local/google/home/advaitjain/github/unsloth-fine-tune-gemma-4/examples/merge_lora.py) (merges adapters to full 16-bit precision safetensors).
 *   **Experimental Sandbox**: [experimental/README.md](file:///usr/local/google/home/advaitjain/github/unsloth-fine-tune-gemma-4/experimental/README.md) (task studies: mapping [experimental/train_regex.py](file:///usr/local/google/home/advaitjain/github/unsloth-fine-tune-gemma-4/experimental/train_regex.py) for custom formats and [experimental/train_emotion.py](file:///usr/local/google/home/advaitjain/github/unsloth-fine-tune-gemma-4/experimental/train_emotion.py) for boundary semantic matching studies).
 
-## Hard constraint: 6 GB VRAM
+## Hardware Requirement: 16 GB VRAM
 
-Every default in the repo is chosen to fit. Before adding or changing
-anything, verify:
+Every default in the repo is chosen to fit within **at least 16 GB of VRAM**.
+Before adding or changing anything, verify:
 
-- 4-bit (`load_in_4bit=True`, `dtype=None`).
-- For QLoRA, the base model fits with training overhead — currently
-  `unsloth/gemma-3-1b-it-unsloth-bnb-4bit` (~3 GB peak training).
-- For inference-only, up to `unsloth/gemma-4-E2B-it-unsloth-bnb-4bit`
-  (~5 GB) is OK but **its QLoRA does NOT fit** on 6 GB (~8–10 GB needed).
-- Prefer the pre-quantized `-unsloth-bnb-4bit` variants — they avoid the
-  transient ~4.4 GiB tensor that the regular loader materializes during
-  weight transfer (this is the specific reason 6 GB cards can't load the
-  non-pre-quantized E2B).
-- Don't propose Gemma 4 E2B fine-tuning, full fine-tuning, or anything
-  needing >6 GB without flagging the constraint and asking.
+- Full 16-bit precision fine-tuning (`load_in_4bit=False`, `dtype=None` or explicit bfloat16/fp16).
+- This repo focuses exclusively on **Gemma 4 E2B** (`unsloth/gemma-4-E2B-it`).
+- Standard 16-bit full-precision SFT adapter training requires approximately **11.7 GB** of VRAM.
+- Base inference in 16-bit requires approximately **10.3 GB** of VRAM.
+- Avoid loading pre-quantized 4-bit variants or proposing QLoRA unless explicitly requested, as the core paradigm centers on full-precision (FP16) PEFT adapters suitable for downstream compilation to LiteRT-LM.
+- Don't propose full fine-tuning or parameter scaling exceeding the 16 GB constraint without flagging the constraint and asking.
 
 ## Tooling
 
@@ -52,7 +50,7 @@ anything, verify:
 
 ## Code conventions (match existing style)
 
-Look at [examples/inference.py](file:///usr/local/google/home/advaitjain/github/unsloth-fine-tune-gemma-4/examples/inference.py) and [examples/finetune_gsm8k.py](file:///usr/local/google/home/advaitjain/github/unsloth-fine-tune-gemma-4/examples/finetune_gsm8k.py) for the canonical shape. In particular:
+Look at [examples/inference.py](file:///usr/local/google/home/advaitjain/github/unsloth-fine-tune-gemma-4/examples/inference.py) and [gsm8k-math/finetune_gsm8k.py](file:///usr/local/google/home/advaitjain/github/unsloth-fine-tune-gemma-4/gsm8k-math/finetune_gsm8k.py) for the canonical shape. In particular:
 
 - Module-level docstring describing what the script does and any non-obvious
   CLI usage. Keep it short — a few lines, not a tutorial.
@@ -83,19 +81,14 @@ Look at [examples/inference.py](file:///usr/local/google/home/advaitjain/github/
     ```
   - Role configurations use string `"model"`, **never** `"assistant"`.
   - Gemma 4 turn templates utilize `<|turn>user\n` and `<|turn>model\n`.
-  - Gemma 3 utilizes standard `<start_of_turn>user\n` and `<start_of_turn>model\n`.
-  - Ensure correct response masking triggers with `train_on_responses_only`:
+  - Ensure correct response masking triggers with `train_on_responses_only` configured for Gemma 4 turn markers:
     ```python
-    if "gemma-4" in model_name.lower():
-        instruction_part = "<|turn>user\n"
-        response_part = "<|turn>model\n"
-    else:
-        instruction_part = "<start_of_turn>user\n"
-        response_part = "<start_of_turn>model\n"
+    instruction_part = "<|turn>user\n"
+    response_part = "<|turn>model\n"
     ```
 - **LiteRT-LM Compiled Execution**:
   - Load pre-compiled `.litertlm` models via `litert_lm.Engine`.
-  - Handle GPU vision falls context safely to guard execution against FFI initialization failures:
+  - Handle GPU vision fallback context safely to guard execution against FFI initialization failures:
     ```python
     try:
         engine = litert_lm.Engine(model_path=path, backend=litert_lm.Backend.CPU, vision_backend=litert_lm.Backend.GPU)
@@ -107,7 +100,7 @@ Look at [examples/inference.py](file:///usr/local/google/home/advaitjain/github/
     import texicode.pipeline as tp
     rendered = tp.render_tex(latex_string, False, True, "raw", {"fonts": "normal"})
     ```
-- Sampling protocols: Default sampling for chat loops recommendation is `temperature=1.0, top_p=0.95, top_k=64`. Logical reasoning reasoning and structured OCR mathematical evaluations require deterministic greedy settings: `do_sample=False`.
+- Sampling protocols: Default sampling for chat loops recommendation is `temperature=1.0, top_p=0.95, top_k=64`. Logical reasoning and structured OCR mathematical evaluations require deterministic greedy settings: `do_sample=False`.
 - Comments only when the *why* is non-obvious. Don't narrate the obvious.
 - Don't add docs files, READMEs in subdirectories, or planning notes.
 
@@ -127,23 +120,26 @@ To calculate precise comparative scores, predictions and gold strings must run t
 Review validated learning takeaways from past task studies in `experiments.md` and `experimental/README.md` before planning updates:
 
 - **The Alignment Tax constraint**: Applying training scripts over restrictive domains reduces baseline zero-shot capability parameters across overall cognitive outputs. Keep learning targets focused and verify scores relative to zero-shot baselines.
-- **The Generalization Bottleneck**: Model configurations under parameter limits (e.g., 1B base scales, rank $r=8$ adapters) lack capacity elements to formulate customized, brand new semantic syntaxes (such as LRegex logic structures). In these settings, training limits cause overfitting over prompt variations, while baseline English PCRE pre-trained priors dominate evaluation queries. Do not request small QLoRA updates for large architectural/syntactic structural transitions.
+- **The Generalization Bottleneck**: Model configurations under parameter limits lack capacity elements to formulate customized, brand new semantic syntaxes (such as LRegex logic structures). In these settings, training limits cause overfitting over prompt variations, while baseline English PCRE pre-trained priors dominate evaluation queries. Do not request small adapter updates for large architectural/syntactic structural transitions.
 - **Low-LR boundaries protecting reasoners**: When running semantic categorization tasks over noisy data categories, utilize low learning rates (such as $2e-5$) rather than standard settings ($2e-4$). This shields base weights from incorrect target designations while stabilizing capability boundaries (see `experimental/README.md` scientific audit).
 
 ## How to run things
 
 ```bash
-# One-shot inference smoke test (default Gemma 4 E2B; pass --model for 1B/4B)
+# One-shot inference smoke test (default Gemma 4 E2B)
 uv run python examples/inference.py
 
-# GSM8K fine-tune end-to-end (BEFORE eval → train → AFTER eval → save adapter)
-uv run python examples/finetune_gsm8k.py
+# GSM8K fine-tune end-to-end in full FP16 precision
+uv run python gsm8k-math/finetune_gsm8k.py
 
 # Vision SFT fine-tune over LaTeX OCR (enforces default 2x Alpha rule for rank)
 uv run python examples/finetune_vision.py --lora-rank 16 --vision-tokens 280 --output-dir lora_vision
 
 # Greedy eval of a saved adapter
-uv run python examples/eval_gsm8k.py --adapter lora_gsm8k/
+uv run python gsm8k-math/eval_gsm8k.py --adapter gsm8k-math/lora_exp17/
+
+# Automated pipeline: Convert adapter to compiled LiteRT-LM format and execute CPU evaluation
+./litert-lm/convert_and_eval.sh
 
 # VLM exact score evaluation (exact score comparisons across N samples)
 uv run python examples/eval_vision.py --model lora_vision/ --eval-rows 50
@@ -157,16 +153,16 @@ There is no test suite. Verify in this order:
 
 1.  **Parse check** (no GPU needed):
     ```bash
-    uv run python -c "import ast; ast.parse(open('examples/<file>.py').read()); print('OK')"
+    uv run python -c "import ast; ast.parse(open('gsm8k-math/finetune_gsm8k.py').read()); print('OK')"
     ```
 2.  **End-to-end smoke run** with reduced settings:
     ```bash
-    uv run python examples/finetune_gsm8k.py --max-steps 10 --train-rows 100 \
+    uv run python gsm8k-math/finetune_gsm8k.py --max-steps 10 --train-rows 100 \
       --output-dir /tmp/lora_smoke
     ```
     Expected: BEFORE eval prints, training loss decreases, AFTER eval prints,
-    adapter saved. Total ~2 min on a 6 GB GPU.
-3.  **Reload check**: `uv run python examples/eval_gsm8k.py --adapter /tmp/lora_smoke`.
+    adapter saved. Total ~2 min on a 16 GB GPU.
+3.  **Reload check**: `uv run python gsm8k-math/eval_gsm8k.py --adapter /tmp/lora_smoke`.
 
 For long training runs, launch via `Bash` with `run_in_background=true` and
 wait for the completion notification. Don't poll. Don't run a parallel
@@ -192,8 +188,7 @@ files explicitly with `git add <file>`; never `git add -A`/`.`.
 - Don't truncate eval generation at 256 tokens — GSM8K reasoning chains
   exceed that. The default in `generate()` is 512 for a reason.
 - Don't recommend bigger LoRA rank or longer training as the first move
-  to improve accuracy on a small base model. At Gemma 3 1B scale, the
-  base capability is the ceiling — see `experiments.md`.
+  to improve accuracy on base models without auditing learning dynamics. The base model's underlying capability acts as a ceiling for complex logical extrapolation — see task experiments.
 - Don't commit `lora_*/` directories or any large weights. They're build
   output, not source.
 - Don't bypass `uv` (no system pip, no `python …` directly).
