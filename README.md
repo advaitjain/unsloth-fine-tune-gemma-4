@@ -40,9 +40,11 @@ uv run python examples/inference.py
 
 ---
 
-## GSM8K Math SFT (Arithmetic Reasoning)
+## GSM8K SFT (Arithmetic Reasoning)
 
 Worked examples of causal language model supervised fine-tuning (SFT) for logical reasoning and multi-step word problem solving using the canonical [GSM8K (Grade School Math 8K)](https://github.com/openai/grade-school-math) dataset hosted on [Hugging Face](https://huggingface.co/datasets/openai/gsm8k).
+
+**LiteRT-LM Deployment**: Conversion, quantization, and evals with LiteRT-LM is a work-in-progress with details in [litert-lm/README.md](litert-lm/README.md).
 
 We fine-tune **Gemma 4 E2B** in full **16-bit precision (FP16)**, applying a $1\times10^{-5}$ learning rate to integrate custom turn markers (`<|turn>user\n`) and structured prose while maintaining zero-shot accuracy.
 
@@ -312,6 +314,11 @@ Across three distinct text-only tasks (GSM8K math, Regex semantic parsing, and E
 │   ├── inference_demo.py           # comparative Zero-shot vs. SFT 5-problems visual reporter CLI
 │   ├── experiments.md              # complete 18-experiment parameter sweeps audit table & insights
 │   └── implementation_plan.md      # parameters configuration proposal plan
+├── litert-lm/                      # LiteRT-LM conversion, quantization, and evaluation pipeline
+│   ├── README.md                   # Step-by-step manual guide and benchmark performance
+│   ├── convert_and_eval.sh         # Automated end-to-end conversion and evaluation script
+│   ├── merge_adapter.py            # Merges LoRA adapter to full precision base weights
+│   └── eval_litert_gsm8k.py        # Batch evaluation script for compiled .litertlm models
 ├── examples/
 │   ├── inference.py                # Base model and merged safetensors formula inference text
 │   ├── finetune_gsm8k.py           # GSM8K QLoRA and fp16 trainer
