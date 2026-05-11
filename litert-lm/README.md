@@ -92,3 +92,14 @@ Evaluate the compiled model against our 100 held-out GSM8K validation problems. 
 ```bash
 uv run python litert-lm/eval_litert_gsm8k.py --model litert-lm/compiled_model/model.litertlm
 ```
+
+#### Quantitative Benchmark Performance
+
+Executing batch evaluations across the held-out 100-problem validation set on the CPU engine backend yields the following metrics:
+
+| Model Configuration | Quant Scheme | Model Size | Score (Exact Match) | Status |
+| :--- | :--- | :---: | :---: | :---: |
+| Base Instruct (`unsloth/gemma-4-E2B-it`) | None (FP16 Safetensors) | 5.2 GB | **84.00%** | Baseline |
+| LiteRT-Community [gemma-4-E2B-it.litertlm](https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/blob/main/gemma-4-E2B-it.litertlm) | `custom` | 2.58 GB | **84.00%** | Baseline |
+| Merged LoRA Adapter (`litert-lm/merged_model`) | None (FP16 Safetensors) | 5.2 GB | **83.00%** | Completed |
+| Compiled LoRA Adapter (`litert-lm/compiled_model/model.litertlm`) | `dynamic_int8` | 4.8 GB | **83.00%** | Completed |
