@@ -198,10 +198,10 @@ See [cuad/experiments.md](cuad/experiments.md) for the complete 10-config hyperp
 
 Worked examples of causal language model supervised fine-tuning (SFT) for logical reasoning and multi-step word problem solving using the canonical [GSM8K (Grade School Math 8K)](https://github.com/openai/grade-school-math) dataset hosted on [Hugging Face](https://huggingface.co/datasets/openai/gsm8k).
 
-We fine-tune **Gemma 4 E2B** in full **16-bit precision (FP16)**, applying our optimal protective low learning rate ($1\times10^{-5}$) to integrate custom turn markers (`<|turn>user\n`) and structured prose without suffering catastrophic forgetting.
+We fine-tune **Gemma 4 E2B** in full **16-bit precision (FP16)**, applying a $1\times10^{-5}$ learning rate to integrate custom turn markers (`<|turn>user\n`) and structured prose while maintaining zero-shot accuracy.
 
 ```bash
-# A. Train 16-bit fp16 SFT peak-retention adapter (r=32, alpha=64, LR 1e-5, Cosine scheduler, 200 steps)
+# A. Train 16-bit fp16 SFT adapter (r=32, alpha=64, LR 1e-5, Cosine scheduler, 200 steps)
 uv run python gsm8k-math/finetune_gsm8k.py \
   --model unsloth/gemma-4-E2B-it \
   --no-4bit \
@@ -222,7 +222,7 @@ uv run python gsm8k-math/inference_demo.py --adapter gsm8k-math/lora_exp17/
 
 #### Qualitative Fine-Tuning Delta (Before vs. After SFT):
 
-SFT successfully trains the model to structure its logical reasoning into clean Markdown lists and explicit arithmetic formulas, matching the exact baseline accuracy without alignment degradation (**83.00% Exact Match**).
+SFT successfully trains the model to structure its logical reasoning into Markdown lists and explicit arithmetic formulas, resulting in an extracted value accuracy of **83.00% Exact Match** (compared to the 84.00% zero-shot baseline).
 
 ##### 1. Structuring Multi-Step Arithmetic Formats (Janet's Ducks)
 
@@ -242,7 +242,7 @@ SFT successfully trains the model to structure its logical reasoning into clean 
     Answer: Janet makes $18 every day at the farmers' market.
     ```
     *Uses generic text symbols and informal suffix summaries.*
-*   **AFTER SFT (Fine-Tuned Peak LoRA Model)**:
+*   **AFTER SFT (Fine-Tuned LoRA Model)**:
     ```markdown
     Here's how to solve the problem step-by-step:
 
@@ -260,9 +260,9 @@ SFT successfully trains the model to structure its logical reasoning into clean 
 
     **Answer:** Janet makes **$18** every day at the farmers' market.
     ```
-    *Perfectly structures enumerated steps, explicit addition/multiplication bounds, and clean bolded answers.*
+    *Generates enumerated steps, explicit addition/multiplication bounds, and bolded answers.*
 
-See [gsm8k-math/experiments.md](gsm8k-math/experiments.md) for the complete 18-experiment hyperparameter sweeps matrix, the alignment tax proof, and the low learning rate shield breakthrough.
+See [gsm8k-math/experiments.md](gsm8k-math/experiments.md) for the complete 18-experiment hyperparameter sweeps matrix and comparative evaluations across data volumes and learning rates.
 
 
 ## Other Experiments
