@@ -4,7 +4,7 @@ set -euo pipefail
 echo "============================================================"
 echo "1. Installing LiteRT-LM compilation and runtime dependencies"
 echo "============================================================"
-uv pip install litert-lm-api-nightly
+uv pip install litert-lm-api
 uv tool install litert-torch-nightly
 
 echo -e "\n============================================================"
@@ -28,9 +28,9 @@ echo -e "\n============================================================"
 echo "4. Running Qualitative 5-Sample Test via CLI"
 echo "============================================================"
 QUESTIONS=(
-  "Janet’s ducks lay 16 eggs per day. She eats three for breakfast every morning and bakes muffins for her friends every day with four. She sells the remainder at the farmers' market daily for $2 per fresh duck egg. How much in dollars does she make every day at the farmers' market?"
+  "Janet’s ducks lay 16 eggs per day. She eats three for breakfast every morning and bakes muffins for her friends every day with four. She sells the remainder at the farmers' market daily for \$2 per fresh duck egg. How much in dollars does she make every day at the farmers' market?"
   "A robe takes 2 bolts of blue fiber and half that much white fiber. How many bolts in total does it take?"
-  "Josh decides to try flipping a house. He buys a house for $80,000 and then puts in $50,000 in repairs. This increased the value of the house by 150%. How much profit did he make?"
+  "Josh decides to try flipping a house. He buys a house for \$80,000 and then puts in \$50,000 in repairs. This increased the value of the house by 150%. How much profit did he make?"
   "James decides to run 3 sprints 3 times a week. He runs 60 meters each sprint. How many total meters does he run a week?"
   "Every day, Wendi feeds each of her chickens three cups of mixed chicken feed, containing seeds, mealworms and vegetables to help keep them healthy. She gives the chickens their feed in three separate meals. In the morning, she gives her flock of chickens 15 cups of feed. In the afternoon, she gives her chickens another 25 cups of feed. How many cups of feed does she need to give her chickens in the final meal of the day if the size of Wendi's flock is 20 chickens?"
 )

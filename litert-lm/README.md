@@ -1,6 +1,6 @@
-# Compiled On-Device Execution (LiteRT-LM) for GSM8K
+# LiteRT-LM Inference for GSM8K
 
-This folder contains the complete end-to-end pipeline for converting fine-tuned LoRA adapters into highly optimized `.litertlm` formats and evaluating them on the GSM8K mathematical reasoning task using Google's [LiteRT-LM framework](https://ai.google.dev/edge/litert-lm).
+This folder contains the complete end-to-end pipeline for converting fine-tuned LoRA adapters into highly optimized `.litertlm` formats and evaluating them on the GSM8K mathematical reasoning task using [LiteRT-LM](https://ai.google.dev/edge/litert-lm).
 
 ---
 
@@ -27,10 +27,10 @@ You can run the entire conversion, qualitative verification, and quantitative ev
 
 If you prefer executing individual steps manually, follow this sequence:
 
-### 1. Install Nightly Compilation Tools
+### 1. Install Compilation Tools
 LiteRT-LM compilation requires `litert-torch-nightly`:
 ```bash
-uv pip install litert-lm-api-nightly
+uv pip install litert-lm-api
 uv tool install litert-torch-nightly
 ```
 
@@ -60,8 +60,35 @@ litert-lm run litert-lm/compiled_model/model.litertlm \
   --prompt="Janet’s ducks lay 16 eggs per day. She eats three for breakfast every morning and bakes muffins for her friends every day with four. She sells the remainder at the farmers' market daily for $2 per fresh duck egg. How much in dollars does she make every day at the farmers' market?"
 ```
 
+#### Qualitative Inference Sample (Janet's Ducks)
+
+Executing the compiled `.litertlm` model via the `litert-lm run` CLI generates structured reasoning outputs matching the formatting integrated during supervised fine-tuning.
+
+*   **Target Output**:
+    ```
+    18
+    ```
+*   **Compiled LiteRT-LM Output**:
+    ```markdown
+    Here's how to solve the problem step-by-step:
+
+    1. **Calculate the total number of eggs Janet has:**
+       Janet's ducks lay 16 eggs per day.
+
+    2. **Calculate the total number of eggs Janet uses:**
+       She eats 3 for breakfast + bakes 4 for friends = 3 + 4 = 7 eggs.
+
+    3. **Calculate the number of eggs remaining to sell:**
+       16 total eggs - 7 used eggs = 9 eggs remaining.
+
+    4. **Calculate the total money she makes:**
+       9 eggs * $2 per egg = $18
+
+    **Answer:** Janet makes **$18** every day at the farmers' market.
+    ```
+
 ### 5. Quantitative Batch Evaluation (Python API)
-Evaluate the compiled model against our 100 held-out GSM8K validation problems. The evaluation script leverages `litert_lm.Engine` with Multi-Token Prediction (MTP) optimization enabled for accelerated decoding:
+Evaluate the compiled model against our 100 held-out GSM8K validation problems. The evaluation script leverages `litert_lm.Engine` on a robust CPU backend to ensure execution stability across target execution environments:
 ```bash
 uv run python litert-lm/eval_litert_gsm8k.py --model litert-lm/compiled_model/model.litertlm
 ```

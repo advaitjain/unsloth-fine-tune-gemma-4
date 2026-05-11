@@ -73,13 +73,12 @@ def main() -> None:
     parser.add_argument("--eval-rows", type=int, default=100)
     args = parser.parse_args()
 
-    print(f"Loading LiteRT-LM Engine with MTP optimization: {args.model}...")
+    print(f"Loading LiteRT-LM Engine on robust CPU backend: {args.model}...")
     litert_lm.set_min_log_severity(litert_lm.LogSeverity.ERROR)
 
     with litert_lm.Engine(
         args.model,
-        backend=litert_lm.Backend.GPU,
-        enable_speculative_decoding=True,
+        backend=litert_lm.Backend.CPU,
     ) as engine:
         print("Loading validation dataset test split...")
         val_dataset = load_dataset(DATASET_NAME, DATASET_CONFIG, split="test")
