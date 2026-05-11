@@ -164,6 +164,8 @@ unsloth_compiled_cache/
 lora_*/
 cuad/lora_*/
 gsm8k-math/lora_*/
+litert-lm/merged_model/
+litert-lm/compiled_model/
 models_litertlm/
 
 .jetskicli/

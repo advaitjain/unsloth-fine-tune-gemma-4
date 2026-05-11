@@ -8,7 +8,8 @@ dependencies = [
     "huggingface_hub>=0.34.0",
     "hf_transfer",
     "texicode",
-    "litert-lm-api",
+    "litert-lm-api-nightly",
+    "litert-torch-nightly",
 ]
 
 [tool.uv]
