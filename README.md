@@ -40,9 +40,81 @@ uv run python examples/inference.py
 
 ---
 
+## GSM8K Math SFT (Arithmetic Reasoning)
+
+Worked examples of causal language model supervised fine-tuning (SFT) for logical reasoning and multi-step word problem solving using the canonical [GSM8K (Grade School Math 8K)](https://github.com/openai/grade-school-math) dataset hosted on [Hugging Face](https://huggingface.co/datasets/openai/gsm8k).
+
+We fine-tune **Gemma 4 E2B** in full **16-bit precision (FP16)**, applying a $1\times10^{-5}$ learning rate to integrate custom turn markers (`<|turn>user\n`) and structured prose while maintaining zero-shot accuracy.
+
+```bash
+# A. Train 16-bit fp16 SFT adapter (r=32, alpha=64, LR 1e-5, Cosine scheduler, 200 steps)
+uv run python gsm8k-math/finetune_gsm8k.py \
+  --model unsloth/gemma-4-E2B-it \
+  --no-4bit \
+  --lora-rank 32 \
+  --lora-alpha 64 \
+  --learning-rate 1e-5 \
+  --lr-scheduler-type cosine \
+  --train-rows 3000 \
+  --max-steps 200 \
+  --output-dir gsm8k-math/lora_exp17
+
+# B. Evaluate the trained LoRA adapter offline (greedy exact match verification over held-out test set)
+uv run python gsm8k-math/eval_gsm8k.py --adapter gsm8k-math/lora_exp17/ --no-4bit --eval-rows 100
+
+# C. Run interactive demonstrator comparing Zero-Shot base outputs vs. SFT adapter side-by-side
+uv run python gsm8k-math/inference_demo.py --adapter gsm8k-math/lora_exp17/
+```
+
+#### Qualitative Fine-Tuning Delta (Before vs. After SFT):
+
+SFT successfully trains the model to structure its logical reasoning into Markdown lists and explicit arithmetic formulas, resulting in an extracted value accuracy of **83.00% Exact Match** (compared to the 84.00% zero-shot baseline).
+
+##### 1. Structuring Multi-Step Arithmetic Formats (Janet's Ducks)
+
+*   **Input Word Problem**:
+    ```
+    Janet’s ducks lay 16 eggs per day. She eats three for breakfast every morning and bakes muffins for her friends every day with four. She sells the remainder at the farmers' market daily for $2 per fresh duck egg. How much in dollars does she make every day at the farmers' market?
+    ```
+*   **EXPECTED GROUND TRUTH (GT)**:
+    ```
+    18
+    ```
+*   **BEFORE SFT (Zero-Shot Base Model)**:
+    ```markdown
+    * Eggs remaining: 16 - 7 = 9 eggs
+    * She sells the remainder (9 eggs) at $2 per egg.
+    * Earnings: 9 \times $2 = $18
+    Answer: Janet makes $18 every day at the farmers' market.
+    ```
+    *Uses generic text symbols and informal suffix summaries.*
+*   **AFTER SFT (Fine-Tuned LoRA Model)**:
+    ```markdown
+    Here's how to solve the problem step-by-step:
+
+    1. **Calculate the total number of eggs Janet has:**
+       Janet's ducks lay 16 eggs per day.
+
+    2. **Calculate the total number of eggs Janet uses:**
+       She eats 3 for breakfast + bakes 4 for friends = 3 + 4 = 7 eggs.
+
+    3. **Calculate the number of eggs remaining to sell:**
+       16 total eggs - 7 used eggs = 9 eggs remaining.
+
+    4. **Calculate the total money she makes:**
+       9 eggs * $2 per egg = $18
+
+    **Answer:** Janet makes **$18** every day at the farmers' market.
+    ```
+    *Generates enumerated steps, explicit addition/multiplication bounds, and bolded answers.*
+
+See [gsm8k-math/experiments.md](gsm8k-math/experiments.md) for the complete 18-experiment hyperparameter sweeps matrix and comparative evaluations across data volumes and learning rates.
+
 ## Multimodal LaTeX OCR SFT
 
-Re-implementation of Unsloth's [Gemma 4 Training Guide](https://unsloth.ai/docs/models/gemma-4/train)
+Re-implementation of Unsloth's [Gemma 4 Training
+Guide](https://unsloth.ai/docs/models/gemma-4/train). Additional details of
+parameter sweeps that we attempted are in [this doc](latex_ocr_experiments.md).
 
 ```bash
 # A. Run zero-shot base model baseline (N=50)
@@ -194,77 +266,6 @@ SFT successfully trims surrounding text and heading numbers noise from raw gener
 See [cuad/experiments.md](cuad/experiments.md) for the complete 10-config hyperparameter sweeps matrix, representation capacity analysis, and additional SFT takeaways.
 
 
-## GSM8K Math SFT (Arithmetic Reasoning)
-
-Worked examples of causal language model supervised fine-tuning (SFT) for logical reasoning and multi-step word problem solving using the canonical [GSM8K (Grade School Math 8K)](https://github.com/openai/grade-school-math) dataset hosted on [Hugging Face](https://huggingface.co/datasets/openai/gsm8k).
-
-We fine-tune **Gemma 4 E2B** in full **16-bit precision (FP16)**, applying a $1\times10^{-5}$ learning rate to integrate custom turn markers (`<|turn>user\n`) and structured prose while maintaining zero-shot accuracy.
-
-```bash
-# A. Train 16-bit fp16 SFT adapter (r=32, alpha=64, LR 1e-5, Cosine scheduler, 200 steps)
-uv run python gsm8k-math/finetune_gsm8k.py \
-  --model unsloth/gemma-4-E2B-it \
-  --no-4bit \
-  --lora-rank 32 \
-  --lora-alpha 64 \
-  --learning-rate 1e-5 \
-  --lr-scheduler-type cosine \
-  --train-rows 3000 \
-  --max-steps 200 \
-  --output-dir gsm8k-math/lora_exp17
-
-# B. Evaluate the trained LoRA adapter offline (greedy exact match verification over held-out test set)
-uv run python gsm8k-math/eval_gsm8k.py --adapter gsm8k-math/lora_exp17/ --no-4bit --eval-rows 100
-
-# C. Run interactive demonstrator comparing Zero-Shot base outputs vs. SFT adapter side-by-side
-uv run python gsm8k-math/inference_demo.py --adapter gsm8k-math/lora_exp17/
-```
-
-#### Qualitative Fine-Tuning Delta (Before vs. After SFT):
-
-SFT successfully trains the model to structure its logical reasoning into Markdown lists and explicit arithmetic formulas, resulting in an extracted value accuracy of **83.00% Exact Match** (compared to the 84.00% zero-shot baseline).
-
-##### 1. Structuring Multi-Step Arithmetic Formats (Janet's Ducks)
-
-*   **Input Word Problem**:
-    ```
-    Janet’s ducks lay 16 eggs per day. She eats three for breakfast every morning and bakes muffins for her friends every day with four. She sells the remainder at the farmers' market daily for $2 per fresh duck egg. How much in dollars does she make every day at the farmers' market?
-    ```
-*   **EXPECTED GROUND TRUTH (GT)**:
-    ```
-    18
-    ```
-*   **BEFORE SFT (Zero-Shot Base Model)**:
-    ```markdown
-    * Eggs remaining: 16 - 7 = 9 eggs
-    * She sells the remainder (9 eggs) at $2 per egg.
-    * Earnings: 9 \times $2 = $18
-    Answer: Janet makes $18 every day at the farmers' market.
-    ```
-    *Uses generic text symbols and informal suffix summaries.*
-*   **AFTER SFT (Fine-Tuned LoRA Model)**:
-    ```markdown
-    Here's how to solve the problem step-by-step:
-
-    1. **Calculate the total number of eggs Janet has:**
-       Janet's ducks lay 16 eggs per day.
-
-    2. **Calculate the total number of eggs Janet uses:**
-       She eats 3 for breakfast + bakes 4 for friends = 3 + 4 = 7 eggs.
-
-    3. **Calculate the number of eggs remaining to sell:**
-       16 total eggs - 7 used eggs = 9 eggs remaining.
-
-    4. **Calculate the total money she makes:**
-       9 eggs * $2 per egg = $18
-
-    **Answer:** Janet makes **$18** every day at the farmers' market.
-    ```
-    *Generates enumerated steps, explicit addition/multiplication bounds, and bolded answers.*
-
-See [gsm8k-math/experiments.md](gsm8k-math/experiments.md) for the complete 18-experiment hyperparameter sweeps matrix and comparative evaluations across data volumes and learning rates.
-
-
 ## Other Experiments
 
 
@@ -272,65 +273,17 @@ See [gsm8k-math/experiments.md](gsm8k-math/experiments.md) for the complete 18-e
 
 Across three distinct text-only tasks (GSM8K math, Regex semantic parsing, and Emotion classification), **SFT on highly capable instruction-tuned LLMs (Gemma 4 E2B) consistently underperforms Zero-Shot baseline prompting**. We observed three distinct limiting dynamics:
 
-1. **Supervised Alignment Tax (GSM8K Math)**:
-   - The base E2B model achieves a very high zero-shot baseline of **84.00%** accuracy.
-   - Fine-tuning on a narrow math dataset (GSM8K) degrades this baseline to **78.00%** (4-bit QLoRA SFT) or **80.00%** (full fp16 SFT). The model suffers a capability drop when forced to adapt its pre-trained instruct transitions to a narrow SFT split.
-   - See [experiments.md](experiments.md) for the detailed math sweeps.
-
-2. **The Generalization Bottleneck (NL-to-Regex)**:
+1. **The Generalization Bottleneck (NL-to-Regex)**:
    - The base model scores **2.00%** exact match (EM) accuracy zero-shot because it generates standard PCRE regexes (like `^[^e]*$`), while the dataset targets a custom logical **LRegex** dialect (`~(.*e.*)`).
    - SFT training successfully overfit the training split (collapsing SFT loss to $0.198$). However, when evaluated on held-out test prompts, the SFT model scored **0.00%** accuracy.
    - SFT on a small dataset (724 rows) acts as a memorization cache; the QLoRA adapter lacks the semantic capacity to synthesize and generalize a completely new logical grammar syntax to unseen prompts. Consequently, the base model's massive pre-trained PCRE regex prior dominates.
    - See [experimental/README.md](experimental/README.md) for the Regex study.
 
-3. **Human Annotator Benchmark Noise (Emotion Classification)**:
+2. **Human Annotator Benchmark Noise (Emotion Classification)**:
    - The base model achieved a baseline of **54.00%** accuracy on the `dair-ai/emotion` dataset, which shifted slightly to **56.00%** after SFT.
    - Manual trace audits revealed that the model's "mismatches" were actually highly logical, conceptually correct classifications (e.g., mapping `"i feel so cold"` to `sadness` instead of the gold label `anger`, or `"friendly affection"` to `love` instead of the gold label `joy`).
    - Because E2B maintains a rigid pre-trained semantic logic under gentle SFT, it refuses to overfit to noisy, inconsistent human annotations, limiting its exact-match accuracy improvement.
    - See [experimental/README.md](experimental/README.md) for the Emotion study.
-
-All SFT training scripts and systematic evaluators are fully structured and parameterized as CLI flags.
-
-### 1. GSM8K Causal Math Evals
-To reproduce our baseline and QLoRA math adapter sweeps:
-
-```bash
-# A. Run base model baseline (N=50)
-uv run python examples/eval_gsm8k_automated.py --num-examples 50
-
-# B. Train 4-bit QLoRA adapter (r=32, LR 2e-5, cosine scheduler)
-uv run python examples/finetune_gsm8k.py \
-  --max-steps 200 \
-  --train-rows 2000 \
-  --lora-rank 32 \
-  --lora-alpha 32 \
-  --learning-rate 2e-5 \
-  --warmup-steps 20 \
-  --lr-scheduler-type cosine \
-  --output-dir lora_gsm8k_4b_s3
-
-# C. Evaluate the trained 4-bit adapter
-uv run python examples/eval_gsm8k_automated.py --adapter lora_gsm8k_4b_s3/ --num-examples 50
-
-# D. Train full-precision (16-bit) adapter
-uv run python examples/finetune_gsm8k.py \
-  --model unsloth/gemma-4-E2B-it \
-  --no-4bit \
-  --max-steps 200 \
-  --train-rows 2000 \
-  --lora-rank 32 \
-  --lora-alpha 32 \
-  --learning-rate 2e-5 \
-  --warmup-steps 20 \
-  --lr-scheduler-type cosine \
-  --output-dir lora_gsm8k_fp16_s1
-
-# E. Evaluate the trained 16-bit adapter
-uv run python examples/eval_gsm8k_automated.py --adapter lora_gsm8k_fp16_s1/ --no-4bit --num-examples 50
-```
-
-### 2. Regex and Emotion Evals (Experimental Folder)
-To reproduce our Custom Syntax and Semantic classification sweeps, navigate to the `experimental/` directory. See [experimental/README.md](experimental/README.md) for exact commands and execution instructions.
 
 
 ---
