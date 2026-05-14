@@ -10,6 +10,7 @@ dependencies = [
     "texicode",
     "litert-lm-api",
     "litert-torch-nightly",
+    "ai-edge-quantizer-nightly",
 ]
 
 [tool.uv]

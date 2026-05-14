@@ -87,6 +87,16 @@ Executing the compiled `.litertlm` model via the `litert-lm run` CLI generates s
     **Answer:** Janet makes **$18** every day at the farmers' market.
     ```
 
+#### Quantized Models Qualitative Comparison
+
+Executing the interactive verification using the same prompt on the quantized models reveals that all evaluated quantization schemes preserve the core reasoning capability, successfully arriving at the correct final answer (**$18**). However, they exhibit minor variations in step breakdown and verbosity:
+
+*   **LiteRT-Community (`gemma-4-E2B-it.litertlm`)**: Employs an explicit 6-step sequence, clearly detailing calculations for eggs eaten, used for muffins, total used, and final remainders without additional conversational parentheticals.
+*   **`dynamic_wi8c_afp32`**: Maintains the 4-step format almost identical to the baseline, with slight phrasing tweaks (e.g., "eggs laid" instead of "eggs Janet has").
+*   **`gemma4_mixed48_hr`**: Preserves the correct logic but introduces a parenthetical comment clarifying the implicit usage of eggs for muffins: `(or the problem intends for the muffins to be made from eggs, but the context is about selling the *remainder* of the laid eggs)`.
+*   **`gemma4_mixed48_b32`**: Adopts a 5-step breakdown (separating eating and baking into distinct steps) and includes a similar clarification regarding muffin preparation verbosity.
+*   **`gemma4_mixed48_b64`**: Arrives at the answer concisely but explicitly remarks on the phrasing ambiguity: `(This part of the problem is a bit confusing... We need to assume this means she uses 4 eggs for the muffins)`.
+
 ### 5. Quantitative Batch Evaluation (Python API)
 Evaluate the compiled model against our 100 held-out GSM8K validation problems. The evaluation script leverages `litert_lm.Engine` on a robust CPU backend to ensure execution stability across target execution environments:
 ```bash
@@ -99,7 +109,10 @@ Executing batch evaluations across the held-out 100-problem validation set on th
 
 | Model Configuration | Quant Scheme | Model Size | Score (Exact Match) | Status |
 | :--- | :--- | :---: | :---: | :---: |
-| Base Instruct (`unsloth/gemma-4-E2B-it`) | None (FP16 Safetensors) | 5.2 GB | **84.00%** | Baseline |
-| LiteRT-Community [gemma-4-E2B-it.litertlm](https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/blob/main/gemma-4-E2B-it.litertlm) | `custom` | 2.58 GB | **84.00%** | Baseline |
-| Merged LoRA Adapter (`litert-lm/merged_model`) | None (FP16 Safetensors) | 5.2 GB | **83.00%** | Completed |
-| Compiled LoRA Adapter (`litert-lm/compiled_model/model.litertlm`) | `dynamic_int8` | 4.8 GB | **83.00%** | Completed |
+| Base Instruct (`unsloth/gemma-4-E2B-it`) | None (FP16 Safetensors) | 9.6 GB | **84.00%** | Baseline |
+| LiteRT-Community [gemma-4-E2B-it.litertlm](https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/blob/main/gemma-4-E2B-it.litertlm) | `custom` | 2.58 GB | **78.00%** | Completed |
+| Merged LoRA Adapter (`litert-lm/merged_model/`) | None (FP16 Safetensors) | 9.6 GB | **83.00%** | Completed |
+| LiteRT-LM int8 | `dynamic_wi8c_afp32` | 5.07 GB | **83.00%** | Completed |
+| LiteRT-LM mixed int8/int4+hadamard rotations | `gemma4_mixed48_hr` | 2.59 GB | **77.00%** | Completed |
+| LiteRT-LM mixed int8 per-channel, blockwise (32) int4 | `gemma4_mixed48_b32` | 2.86 GB | **77.00%** | Completed |
+| LiteRT-LM mixed int8 per-channel, blockwise (64) int4 | `gemma4_mixed48_b64` | 2.70 GB | **77.00%** | Completed |

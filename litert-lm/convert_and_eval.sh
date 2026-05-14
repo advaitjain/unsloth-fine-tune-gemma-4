@@ -6,6 +6,7 @@ echo "1. Installing LiteRT-LM compilation and runtime dependencies"
 echo "============================================================"
 uv pip install litert-lm-api
 uv tool install litert-torch-nightly
+uv tool install ai-edge-quantizer-nightly
 
 echo -e "\n============================================================"
 echo "2. Merging LoRA adapter (EXP_17) into base safetensors"
@@ -15,14 +16,15 @@ uv run python litert-lm/merge_adapter.py \
   --output-dir litert-lm/merged_model
 
 echo -e "\n============================================================"
-echo "3. Exporting merged safetensors to LiteRT-LM format"
+echo "3. Exporting merged safetensors to LiteRT-LM format. Use empty quantization recipe to get a float model."
 echo "============================================================"
 mkdir -p litert-lm/compiled_model
 litert-torch export_hf \
   --model=litert-lm/merged_model \
   --output_dir=litert-lm/compiled_model \
   --externalize_embedder \
-  --jinja_chat_template_override=litert-community/gemma-4-E2B-it-litert-lm
+  --jinja_chat_template_override=litert-community/gemma-4-E2B-it-litert-lm \
+  --quantization_recipe=""
 
 echo -e "\n============================================================"
 echo "4. Running Qualitative 5-Sample Test via CLI"
