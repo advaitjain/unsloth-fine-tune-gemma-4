@@ -2455,6 +2455,7 @@ name = "unsloth-fine-tune-gemma-4"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "ai-edge-quantizer-nightly" },
     { name = "hf-transfer" },
     { name = "huggingface-hub" },
     { name = "litert-lm-api" },
@@ -2465,6 +2466,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "ai-edge-quantizer-nightly" },
     { name = "hf-transfer" },
     { name = "huggingface-hub", specifier = ">=0.34.0" },
     { name = "litert-lm-api" },
