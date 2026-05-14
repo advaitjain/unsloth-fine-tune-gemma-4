@@ -15,23 +15,37 @@ uv sync
 
 ## Automated Pipeline Execution
 
-You can run the entire conversion, qualitative verification, and quantitative evaluation pipeline using our standalone bash script:
+You can run the entire conversion, qualitative verification, and quantitative evaluation pipeline using our standalone bash script. By default, batch quantitative evaluations are skipped to prioritize fast feedback:
 
 ```bash
+# Run compilation and qualitative tests only (default output directory: litert-lm)
 ./litert-lm/convert_and_eval.sh
+
+# Override output directory and enable full batch quantitative evaluations
+./litert-lm/convert_and_eval.sh --output-dir custom_path --batch-eval
 ```
 
 ---
 
 ## Step-by-Step Manual Guide
 
-If you prefer executing individual steps manually, follow this sequence:
+If you prefer executing individual steps manually, follow this sequence. Execution timings are estimated below for a target model deployment flow:
+
+| Step Sequence | Execution Activity | Estimated Completion Duration |
+| :--- | :--- | :---: |
+| **Step 1** | Install Compilation Tools | ~30 seconds |
+| **Step 2** | Merge LoRA Adapter into Base Safetensors | ~2 minutes |
+| **Step 3** | Export to unquantized Float `.litertlm` Format | ~6 minutes |
+| **Step 4** | Apply Quantization via AI Edge Quantizer (`aeq`) | 30s to 1 min per recipe |
+| **Step 5** | Qualitative Interactive Verification (CLI) | ~15 seconds per trace |
+| **Step 6** | Quantitative Batch Evaluation (Python API) | ~20 minutes per model |
 
 ### 1. Install Compilation Tools
-LiteRT-LM compilation requires `litert-torch-nightly`:
+LiteRT-LM compilation requires `litert-torch-nightly` and `ai-edge-quantizer-nightly`:
 ```bash
 uv pip install litert-lm-api
 uv tool install litert-torch-nightly
+uv tool install ai-edge-quantizer-nightly
 ```
 
 ### 2. Merge LoRA Adapter into Base Safetensors
@@ -42,40 +56,27 @@ uv run python litert-lm/merge_adapter.py \
   --output-dir litert-lm/merged_model
 ```
 
-### 3. Export to `.litertlm` Format
-Convert the merged Hugging Face safetensors into a compiled LiteRT-LM model, applying the appropriate chat template override:
+### 3. Export to unquantized Float `.litertlm` Format
+Convert the merged Hugging Face safetensors into a compiled LiteRT-LM model. We pass an explicit empty quantization recipe string (`--quantization_recipe=""`) to ensure the model compiles natively as unquantized float before post-training quantization schemes are applied:
 ```bash
 mkdir -p litert-lm/compiled_model
 litert-torch export_hf \
   --model=litert-lm/merged_model \
   --output_dir=litert-lm/compiled_model \
   --externalize_embedder \
-  --jinja_chat_template_override=litert-community/gemma-4-E2B-it-litert-lm
+  --jinja_chat_template_override=litert-community/gemma-4-E2B-it-litert-lm \
+  --quantization_recipe=""
 ```
 
-### 5. Quantitative Batch Evaluation (Python API)
-Evaluate the compiled model against our 100 held-out GSM8K validation problems. The evaluation script leverages `litert_lm.Engine` on a robust CPU backend to ensure execution stability across target execution environments:
+### 4. Apply Quantization via AI Edge Quantizer (`aeq`)
+Apply target quantization schemes to the baseline float model (`model.litertlm`) using the AI Edge Quantizer CLI. The tool generates standalone optimized `.litertlm` files alongside the input weights:
 ```bash
-uv run python litert-lm/eval_litert_gsm8k.py --model litert-lm/compiled_model/model.litertlm
+# Example applying dynamic range int8 weights/float activations
+uv run aeq --model_file litert-lm/compiled_model/model.litertlm --recipe=dynamic_wi8c_afp32 --output_dir litert-lm/compiled_model --overwrite_outputs
 ```
-
-#### Quantitative Benchmark Performance
-
-Executing batch evaluations across the held-out 100-problem validation set on the CPU engine backend yields the following metrics:
-
-| Model Configuration | Quant Scheme | Model Size | Score (Exact Match) | Status |
-| :--- | :--- | :---: | :---: | :---: |
-| Base Instruct (`unsloth/gemma-4-E2B-it`) | None (FP16 Safetensors) | 9.6 GB | **84.00%** | Baseline |
-| LiteRT-Community [gemma-4-E2B-it.litertlm](https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/blob/main/gemma-4-E2B-it.litertlm) | `custom` | 2.58 GB | **78.00%** | Completed |
-| Merged LoRA Adapter (`litert-lm/merged_model/`) | None (FP16 Safetensors) | 9.6 GB | **83.00%** | Completed |
-| LiteRT-LM int8 | `dynamic_wi8c_afp32` | 5.07 GB | **83.00%** | Completed |
-| LiteRT-LM mixed int8/int4+hadamard rotations | `gemma4_mixed48_hr` | 2.59 GB | **77.00%** | Completed |
-| LiteRT-LM mixed int8 per-channel, blockwise (32) int4 | `gemma4_mixed48_b32` | 2.86 GB | **77.00%** | Completed |
-| LiteRT-LM mixed int8 per-channel, blockwise (64) int4 | `gemma4_mixed48_b64` | 2.70 GB | **77.00%** | Completed |
-
 
 ### 5. Qualitative Interactive Verification (CLI)
-Run the compiled model directly from the terminal using the `litert-lm` CLI to inspect reasoning traces for specific word problems:
+Run the compiled models directly from the terminal using the `litert-lm` CLI to inspect reasoning traces for specific word problems:
 ```bash
 litert-lm run litert-lm/compiled_model/model.litertlm \
   --prompt="Janet’s ducks lay 16 eggs per day. She eats three for breakfast every morning and bakes muffins for her friends every day with four. She sells the remainder at the farmers' market daily for $2 per fresh duck egg. How much in dollars does she make every day at the farmers' market?"
@@ -118,4 +119,22 @@ Executing the compiled `.litertlm` model via the `litert-lm run` CLI generates s
 | **`gemma4_mixed48_b32`** | Here's how to solve the problem step-by-step:<br><br>1. **Find the total number of eggs Janet has:**<br>   Janet's ducks lay 16 eggs per day.<br><br>2. **Find the number of eggs she eats:**<br>   She eats 3 eggs for breakfast.<br><br>3. **Find the number of eggs she bakes:**<br>   She bakes 4 muffins (which implies she uses 4 eggs, as the problem states she bakes muffins *with* four, but the context implies these are eggs being used).<br><br>4. **Find the number of remaining eggs:**<br>   Total eggs - Eggs eaten - Eggs baked = Remaining eggs<br>   $16 - 3 - 4 = 9$ eggs<br><br>5. **Calculate the total money she makes:**<br>   She sells the remainder at $2 per egg.<br>   $9 \text{ eggs} \times \$2/\text{egg} = \$18$<br><br>**Answer:** She makes **$18** every day at the farmers' market. |
 | **`gemma4_mixed48_b64`** | Here's how to solve the problem step-by-step:<br><br>1. **Find the number of eggs Janet has left after breakfast and baking:**<br>   * She starts with 16 eggs.<br>   * She eats 3 for breakfast: $16 - 3 = 13$ eggs.<br>   * She bakes 4 muffins (This part of the problem is a bit confusing. It says "she bakes muffins for her friends every day with four." We need to assume this means she uses 4 eggs for the muffins).<br>   * Eggs remaining after baking: $13 - 4 = 9$ eggs.<br><br>2. **Calculate the total money she makes at the market:**<br>   * She sells the remainder (9 eggs) at $2 per egg.<br>   * $9 \times \$2 = \$18$<br><br>**Answer:** Janet makes **$18** every day at the farmers' market. |
 
+### 6. Quantitative Batch Evaluation (Python API)
+Evaluate compiled models against our 100 held-out GSM8K validation problems. Batch quantitative loops are disabled by default in the automated pipeline script to avoid multi-hour serial execution times on local CPU environments:
+```bash
+uv run python litert-lm/eval_litert_gsm8k.py --model litert-lm/compiled_model/model.litertlm
+```
 
+#### Quantitative Benchmark Performance
+
+Executing batch evaluations across the held-out 100-problem validation set on the CPU engine backend yields the following metrics:
+
+| Model Configuration | Quant Scheme | Model Size | Score (Exact Match) | Status |
+| :--- | :--- | :---: | :---: | :---: |
+| Base Instruct (`unsloth/gemma-4-E2B-it`) | None (FP16 Safetensors) | 9.6 GB | **84.00%** | Baseline |
+| LiteRT-Community [gemma-4-E2B-it.litertlm](https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/blob/main/gemma-4-E2B-it.litertlm) | `custom` | 2.58 GB | **78.00%** | Completed |
+| Merged LoRA Adapter (`litert-lm/merged_model/`) | None (FP16 Safetensors) | 9.6 GB | **83.00%** | Completed |
+| LiteRT-LM int8 | `dynamic_wi8c_afp32` | 5.07 GB | **83.00%** | Completed |
+| LiteRT-LM mixed int8/int4+hadamard rotations | `gemma4_mixed48_hr` | 2.59 GB | **77.00%** | Completed |
+| LiteRT-LM mixed int8 per-channel, blockwise (32) int4 | `gemma4_mixed48_b32` | 2.86 GB | **77.00%** | Completed |
+| LiteRT-LM mixed int8 per-channel, blockwise (64) int4 | `gemma4_mixed48_b64` | 2.70 GB | **77.00%** | Completed |
