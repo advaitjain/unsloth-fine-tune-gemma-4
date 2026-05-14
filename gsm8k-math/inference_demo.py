@@ -114,8 +114,9 @@ def main() -> None:
     parser.add_argument(
         "--adapter",
         "-a",
-        required=True,
-        help="Path to the trained PEFT adapter weights directory.",
+        required=False,
+        default=None,
+        help="Path to the trained PEFT adapter weights directory (optional).",
     )
     parser.add_argument(
         "--no-4bit",
@@ -156,26 +157,27 @@ def main() -> None:
     # ==========================================
     # PHASE 2: OPTIMIZED SFT RUN
     # ==========================================
-    print(f"\nLoading fine-tuned PEFT adapter: {args.adapter}...")
-    model, tokenizer = FastModel.from_pretrained(
-        model_name=args.adapter,
-        max_seq_length=2048,
-        dtype=None,
-        load_in_4bit=args.load_in_4bit,
-    )
-    FastModel.for_inference(model)
-
     predictions_sft = []
-    print("Executing SFT math predictions...")
-    for idx, sample in enumerate(targets):
-        completion = generate_greedy_completion(model, tokenizer, sample["question"])
-        ans = extract_answer(completion)
-        predictions_sft.append({"text": completion, "ans": ans})
-        print(f"  [{idx+1}] Compiled SFT prediction.")
+    if args.adapter:
+        print(f"\nLoading fine-tuned PEFT adapter: {args.adapter}...")
+        model, tokenizer = FastModel.from_pretrained(
+            model_name=args.adapter,
+            max_seq_length=2048,
+            dtype=None,
+            load_in_4bit=args.load_in_4bit,
+        )
+        FastModel.for_inference(model)
 
-    del model
-    torch.cuda.empty_cache()
-    gc.collect()
+        print("Executing SFT math predictions...")
+        for idx, sample in enumerate(targets):
+            completion = generate_greedy_completion(model, tokenizer, sample["question"])
+            ans = extract_answer(completion)
+            predictions_sft.append({"text": completion, "ans": ans})
+            print(f"  [{idx+1}] Compiled SFT prediction.")
+
+        del model
+        torch.cuda.empty_cache()
+        gc.collect()
 
     # ==========================================
     # PHASE 3: MATH REASONING COMPARISON REPORT
@@ -186,7 +188,6 @@ def main() -> None:
 
     for idx, sample in enumerate(targets):
         p_base = predictions_base[idx]
-        p_sft = predictions_sft[idx]
         
         print(f"\n\n### [{idx+1}] PROBLEM {idx+1}:")
         print(f"{'-' * 80}")
@@ -195,13 +196,17 @@ def main() -> None:
         
         print(f"\n--- [BEFORE SFT] Zero-Shot Base Generation (Is_Correct: {p_base['ans'] == sample['answer']}) ---")
         print(f"Extracted value: {repr(p_base['ans'])}")
-        # Print last 200 chars of base reasoning for format inspect
-        print(f"Prose logic (suffix): ...{p_base['text'][-250:].replace(chr(10), ' ')}")
-        
-        print(f"\n--- [AFTER SFT] Fine-Tuned LoRA Generation (Is_Correct: {p_sft['ans'] == sample['answer']}) ---")
-        print(f"Extracted value: {repr(p_sft['ans'])}")
-        # Print SFT reasoning
-        print(f"Optimized SFT logic: {p_sft['text']}")
+        if args.adapter:
+            # Print last 250 chars of base reasoning for format inspect
+            print(f"Prose logic (suffix): ...{p_base['text'][-250:].replace(chr(10), ' ')}")
+            
+            p_sft = predictions_sft[idx]
+            print(f"\n--- [AFTER SFT] Fine-Tuned LoRA Generation (Is_Correct: {p_sft['ans'] == sample['answer']}) ---")
+            print(f"Extracted value: {repr(p_sft['ans'])}")
+            print(f"Optimized SFT logic:\n{p_sft['text']}")
+        else:
+            print(f"Prose logic:\n{p_base['text']}")
+            
         print(f"{'=' * 80}")
 
     print("\nVisual mathematical audit complete.")

@@ -84,12 +84,25 @@ SFT successfully trains the model to structure its logical reasoning into Markdo
     ```
 *   **BEFORE SFT (Zero-Shot Base Model)**:
     ```markdown
-    * Eggs remaining: 16 - 7 = 9 eggs
-    * She sells the remainder (9 eggs) at $2 per egg.
-    * Earnings: 9 \times $2 = $18
-    Answer: Janet makes $18 every day at the farmers' market.
+    Here's how to solve the problem step-by-step:
+
+    1. **Calculate the total number of eggs laid:**
+       Janet's ducks lay 16 eggs per day.
+
+    2. **Calculate the total number of eggs she uses:**
+       * Eggs for breakfast: 3
+       * Eggs for muffins: 4
+       * Total eggs used: $3 + 4 = 7$ eggs
+
+    3. **Calculate the number of remaining eggs (eggs sold):**
+       * Eggs remaining: $16 - 7 = 9$ eggs
+
+    4. **Calculate the total money she makes:**
+       * She sells the remainder (9 eggs) at $\$2$ per egg.
+       * Earnings: $9 \times \$2 = \$18$
+
+    **Answer:** Janet makes **\$18** every day at the farmers' market.
     ```
-    *Uses generic text symbols and informal suffix summaries.*
 *   **AFTER SFT (Fine-Tuned LoRA Model)**:
     ```markdown
     Here's how to solve the problem step-by-step:
